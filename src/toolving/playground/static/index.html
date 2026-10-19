@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Learner playground</title><script>try{var t=localStorage.getItem("playground-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <strong class="brand">Learner playground</strong>
+  <span id="session" class="muted">connecting…</span>
+  <div class="learner-bar">
+    <label>Learner <select id="learner" aria-label="Learner"></select></label>
+    <button id="new-learner" type="button">New</button>
+    <button id="fork-learner" type="button">Fork</button>
+    <button id="theme" type="button" title="Theme: follow the system, dark, or light">◐ System</button>
+    <label>Mode <select id="mode" aria-label="Mode"><option value="LEARNING">Learning</option><option value="PREDICTION_ONLY">Prediction only</option></select></label>
+  </div>
+</header>
+<div id="error" role="alert" hidden></div>
+<div class="layout">
+  <main>
+    <div id="messages" aria-live="polite"><p class="empty muted" id="empty">Create or pick a learner, teach it a couple of examples, then ask it something new.</p></div>
+    <form id="composer" autocomplete="off">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="ask" class="on">Ask</button>
+        <button type="button" role="tab" data-tab="teach">Teach</button>
+        <button type="button" role="tab" data-tab="batch">Batch</button>
+      </div>
+      <div data-pane="ask">
+        <textarea id="ask-input" rows="2" placeholder="Input to predict — e.g. zorb likes plonk"></textarea>
+        <div class="row"><label>Format <select id="ask-format"><option value="text">text</option><option value="json">JSON</option></select></label>
+          <label>Memories <select id="ask-evidence"><option value="narrow">narrow</option><option value="broad">broad</option><option value="none">none</option></select></label>
+          <small class="muted">Enter to send · Shift+Enter for a new line</small><button type="submit">Predict</button></div>
+      </div>
+      <div data-pane="teach" hidden>
+        <div class="pair"><input id="teach-input" placeholder="Input — e.g. alice likes bob"><span>→</span><input id="teach-output" placeholder="Output — e.g. bob likes alice"></div>
+        <div class="row"><small class="muted">One authoritative example.</small><button type="submit">Teach</button></div>
+      </div>
+      <div data-pane="batch" hidden>
+        <textarea id="batch-input" rows="5" placeholder="Alternating lines: input, output, input, output…"></textarea>
+        <div class="row"><small class="muted">Trains all pairs in one call (admin key).</small><button type="submit">Train batch</button></div>
+      </div>
+    </form>
+  </main>
+  <aside>
+    <section>
+      <h2>Memory</h2>
+      <textarea id="remember-input" rows="2" placeholder="An observation (text or JSON)"></textarea>
+      <div class="row"><button id="remember" type="button">Remember</button><button id="maintain" type="button" title="Re-file memories no learned pattern parsed when they were stored">Maintain</button></div>
+      <textarea id="recall-input" rows="2" placeholder="Cue to recall"></textarea>
+      <div class="row"><label>Mode <select id="recall-mode"><option value="narrow">narrow</option><option value="broad">broad</option></select></label><button id="recall" type="button">Recall</button></div>
+      <pre id="recall-output" class="evidence" hidden></pre>
+    </section>
+    <section>
+      <h2>Activity</h2>
+      <ol id="activity" reversed></ol>
+    </section>
+  </aside>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

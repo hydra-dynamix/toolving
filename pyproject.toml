@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "toolving"
+version = "0.12.1"
+description = "Agent-friendly Python client for the Toolving API"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.27,<1"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://toolving.com"
+Documentation = "https://toolving.com/docs"
+Repository = "https://github.com/hydra-dynamix/toolving"
+Issues = "https://github.com/hydra-dynamix/toolving/issues"
+
+[project.scripts]
+toolving-playground = "toolving.playground:main"
+
+[dependency-groups]
+dev = [
+    "mypy==1.19.1",
+    "pytest>=8",
+    "ruff==0.15.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/toolving"]
