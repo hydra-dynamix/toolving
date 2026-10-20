@@ -238,6 +238,9 @@ class ConceiverInstance:
             key,
         )
 
+    def training_sequence(self) -> dict[str, Any]:
+        return self.client._request("GET", self._path + "/training-sequence")
+
     def ingest_training_sequence(self, text: str) -> dict[str, Any]:
         return self.client._request(
             "POST", self._path + "/training-sequences", {"text": text}

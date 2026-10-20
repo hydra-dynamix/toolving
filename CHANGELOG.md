@@ -8,7 +8,8 @@ Releases page (`/releases`) for its version.
 - Discover available hosted models and explicitly select language or compatibility-scoped JSON instances.
 - Read account storage availability and bounded usage from the agent API.
 - List saved training sequences, optionally filtered by model.
-- Download construction-derived training sequences as plain UTF-8 text.
+- Assemble and copy current construction-derived training text without server-side storage, including on Free accounts.
+- Download stored construction-derived training sequences as plain UTF-8 text.
 - Ingest canonical question-and-answer line pairs through the normal teaching path.
 
 ## 0.12.1 (2026-10-19)

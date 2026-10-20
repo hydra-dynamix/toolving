@@ -103,8 +103,18 @@ def test_plain_text_training_sequence_download_and_ingestion():
 
     def handler(request):
         requests.append((request.method, request.url.path, request.content))
-        if request.method == "GET":
+        if request.url.path.endswith("/file"):
             return httpx.Response(200, text="question\nanswer\n")
+        if request.url.path.endswith("/training-sequence"):
+            return httpx.Response(
+                200,
+                json={
+                    "format": "text/plain",
+                    "text": "question\nanswer\n",
+                    "teaching_count": 1,
+                    "stored": False,
+                },
+            )
         if request.url.path == "/v1/instances/instance/training-sequences":
             return httpx.Response(200, json={"status": "INGESTED", "teaching_count": 1})
         return httpx.Response(
@@ -118,7 +128,10 @@ def test_plain_text_training_sequence_download_and_ingestion():
 
     client = _client(handler)
     assert client.training_sequence_text("sequence") == "question\nanswer\n"
-    assert client.instance("instance").ingest_training_sequence("question\nanswer\n")["teaching_count"] == 1
+    instance = client.instance("instance")
+    assert instance.training_sequence()["text"] == "question\nanswer\n"
+    assert instance.training_sequence()["stored"] is False
+    assert instance.ingest_training_sequence("question\nanswer\n")["teaching_count"] == 1
     assert json.loads(requests[-1][2]) == {"text": "question\nanswer\n"}
 
 
