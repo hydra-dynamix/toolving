@@ -65,6 +65,30 @@ def test_query_transports_markdown_evidence_and_optional_complete_episodes():
     ]
 
 
+def test_plain_text_training_sequence_download_and_ingestion():
+    requests = []
+
+    def handler(request):
+        requests.append((request.method, request.url.path, request.content))
+        if request.method == "GET":
+            return httpx.Response(200, text="question\nanswer\n")
+        if request.url.path == "/v1/instances/instance/training-sequences":
+            return httpx.Response(200, json={"status": "INGESTED", "teaching_count": 1})
+        return httpx.Response(
+            200,
+            json={
+                "operation_id": "op_create",
+                "status": "SUCCEEDED",
+                "result": {"instance_id": "instance", "status": "ACTIVE"},
+            },
+        )
+
+    client = _client(handler)
+    assert client.training_sequence_text("sequence") == "question\nanswer\n"
+    assert client.instance("instance").ingest_training_sequence("question\nanswer\n")["teaching_count"] == 1
+    assert json.loads(requests[-1][2]) == {"text": "question\nanswer\n"}
+
+
 def test_reap_returns_persistence_and_verified_artifact_identity():
     digest = "a" * 64
 

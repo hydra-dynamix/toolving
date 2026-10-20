@@ -38,6 +38,13 @@ with ConceiverClient(api_url, account_api_key) as client:
     print(prediction.confidence)
     print(prediction.evidence.markdown)
 
+    sequence_id = instance.save(key="save-training")
+    training_text = client.training_sequence_text(sequence_id)
+    print(training_text)
+
+    imported = client.create(key="create-import-target")
+    imported.ingest_training_sequence(training_text)
+
     remembered = instance.query(
         "Where do Acme invoices go?",
         with_memory=True,
@@ -49,7 +56,7 @@ with ConceiverClient(api_url, account_api_key) as client:
     print(retirement.persisted, retirement.artifact)
 ```
 
-A standard query costs 1 credit. `with_memory=True` requests complete relevant teaching episodes and costs 2 credits. Teaching costs 5 credits. Conceiver returns `hypothesis`, `confident`, or `high` as evidence levels, not probability percentages. Always check `status` before using an answer.
+Saved training sequences are UTF-8 `.txt` files. Each teaching uses one question line and one answer line; one empty line separates teachings. `ingest_training_sequence()` validates this format and sends each pair through normal teaching. A standard query costs 1 credit. `with_memory=True` requests complete relevant teaching episodes and costs 2 credits. Teaching costs 5 credits. Conceiver returns `hypothesis`, `confident`, or `high` as evidence levels, not probability percentages. Always check `status` before using an answer.
 
 Final retirement on an account with storage returns checksum-verified artifact metadata. Final retirement without storage returns `persisted=False` and discards live memory. Reaping one of several active instances does not retire the shared account state.
 

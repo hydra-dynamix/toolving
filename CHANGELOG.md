@@ -3,6 +3,12 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
+## Unreleased
+
+- List saved training sequences, optionally filtered by model.
+- Download construction-derived training sequences as plain UTF-8 text.
+- Ingest canonical question-and-answer line pairs through the normal teaching path.
+
 ## 0.12.1 (2026-10-19)
 
 - Expose answered and unresolved Markdown decision evidence as `TextPrediction.evidence`.

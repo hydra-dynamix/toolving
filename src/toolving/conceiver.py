@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from typing import Any, Literal
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from uuid import uuid4
 
 import httpx
@@ -116,8 +116,32 @@ class ConceiverClient:
     def operation(self, identity: str) -> dict[str, Any]:
         return self._request("GET", "/v1/operations/" + quote(identity, safe=""))
 
+    def sequences(
+        self, *, limit: int = 50, offset: int = 0, model: str | None = None
+    ) -> dict[str, Any]:
+        query = urlencode(
+            {
+                "limit": limit,
+                "offset": offset,
+                **({"model": model} if model is not None else {}),
+            }
+        )
+        return self._request("GET", "/v1/sequences?" + query)
+
     def sequence(self, identity: str) -> dict[str, Any]:
         return self._request("GET", "/v1/sequences/" + quote(identity, safe=""))
+
+    def training_sequence_text(self, identity: str) -> str:
+        response = self._http.get(
+            self.base_url + "/v1/sequences/" + quote(identity, safe="") + "/file",
+            headers=self._headers,
+        )
+        if response.is_error:
+            response_body = response.json()
+            if "error" in response_body:
+                raise ConceiverAPIError(response.status_code, response_body["error"])
+            response.raise_for_status()
+        return response.text
 
 
 @dataclass(frozen=True)
@@ -181,6 +205,11 @@ class ConceiverInstance:
             self._path + "/resolve",
             {"prediction_id": prediction_id, "answer": answer},
             key,
+        )
+
+    def ingest_training_sequence(self, text: str) -> dict[str, Any]:
+        return self.client._request(
+            "POST", self._path + "/training-sequences", {"text": text}
         )
 
     def save(self, *, key: str | None = None) -> str:
