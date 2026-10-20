@@ -2,6 +2,8 @@
 
 Python client for the hosted Toolving API. It depends only on `httpx`.
 
+See the [customer changelog](CHANGELOG.md) for release updates.
+
 ## Install
 
 Download the wheel from the [Toolving releases page](https://github.com/hydra-dynamix/toolving/releases), verify the published SHA-256 checksum, then install it:
