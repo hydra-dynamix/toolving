@@ -20,7 +20,9 @@ Python 3.10 or later is required.
 from toolving import ConceiverClient
 
 with ConceiverClient(api_url, account_api_key) as client:
-    instance = client.create(key="create-workflow")
+    print(client.models())
+    print(client.storage())
+    instance = client.create(model="language", key="create-workflow")
     instance.teach(
         "Where do Acme invoices go?",
         "Finance / vendors / Acme",
@@ -55,6 +57,8 @@ with ConceiverClient(api_url, account_api_key) as client:
     retirement = instance.reap(key="retire-workflow")
     print(retirement.persisted, retirement.artifact)
 ```
+
+`client.models()` lists selectable hosted models. JSON selection also requires `client_host` and a 64-character hexadecimal `compatibility_scope`. `client.storage()` reports whether durable account storage is enabled and its bounded usage.
 
 Saved training sequences are UTF-8 `.txt` files. Each teaching uses one question line and one answer line; one empty line separates teachings. `ingest_training_sequence()` validates this format and sends each pair through normal teaching. A standard query costs 1 credit. `with_memory=True` requests complete relevant teaching episodes and costs 2 credits. Teaching costs 5 credits. Conceiver returns `hypothesis`, `confident`, or `high` as evidence levels, not probability percentages. Always check `status` before using an answer.
 

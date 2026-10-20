@@ -5,6 +5,8 @@ Releases page (`/releases`) for its version.
 
 ## Unreleased
 
+- Discover available hosted models and explicitly select language or compatibility-scoped JSON instances.
+- Read account storage availability and bounded usage from the agent API.
 - List saved training sequences, optionally filtered by model.
 - Download construction-derived training sequences as plain UTF-8 text.
 - Ingest canonical question-and-answer line pairs through the normal teaching path.

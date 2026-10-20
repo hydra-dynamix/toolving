@@ -102,12 +102,43 @@ class ConceiverClient:
             response.raise_for_status()
         return response.json()
 
+    def models(self) -> dict[str, Any]:
+        return self._request("GET", "/v1/models")
+
+    def storage(self) -> dict[str, Any]:
+        return self._request("GET", "/v1/storage")
+
     def create(
-        self, *, sequence_id: str | None = None, key: str | None = None
+        self,
+        *,
+        sequence_id: str | None = None,
+        model: Literal["language", "json"] | None = None,
+        client_host: Literal["pi", "codex", "claude-code"] | None = None,
+        compatibility_scope: str | None = None,
+        key: str | None = None,
     ) -> "ConceiverInstance":
-        receipt = self._request(
-            "POST", "/v1/instances", {"sequence_id": sequence_id}, key
-        )
+        body: dict[str, Any] = {"sequence_id": sequence_id}
+        if model == "json":
+            if client_host is None or compatibility_scope is None:
+                raise ValueError("JSON model selection requires client_host and compatibility_scope")
+            body.update(
+                {
+                    "model": "json",
+                    "contract": "toolving-conceiver-json-v1",
+                    "client": {
+                        "kind": "agent-harness",
+                        "host": client_host,
+                        "compatibilityScope": compatibility_scope,
+                    },
+                }
+            )
+        elif model == "language":
+            if client_host is not None or compatibility_scope is not None:
+                raise ValueError("language model selection does not accept a JSON client scope")
+            body["model"] = "language"
+        elif client_host is not None or compatibility_scope is not None:
+            raise ValueError("select the JSON model before supplying its client scope")
+        receipt = self._request("POST", "/v1/instances", body, key)
         return self.instance(receipt["result"]["instance_id"])
 
     def instance(self, identity: str) -> "ConceiverInstance":

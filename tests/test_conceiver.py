@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 
 from toolving import ConceiverClient
 
@@ -63,6 +64,38 @@ def test_query_transports_markdown_evidence_and_optional_complete_episodes():
             {"question": "question", "withMemory": True},
         ),
     ]
+
+
+def test_model_catalog_storage_and_explicit_selection():
+    requests = []
+
+    def handler(request):
+        body = json.loads(request.content) if request.content else None
+        requests.append((request.method, request.url.path, body))
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"models": [{"id": "language"}, {"id": "json"}]})
+        if request.url.path == "/v1/storage":
+            return httpx.Response(200, json={"enabled": True, "backend": "account"})
+        return httpx.Response(
+            200,
+            json={"operation_id": "op_create", "status": "SUCCEEDED", "result": {"instance_id": "instance"}},
+        )
+
+    client = _client(handler)
+    assert [model["id"] for model in client.models()["models"]] == ["language", "json"]
+    assert client.storage()["enabled"] is True
+    assert client.create(model="language").instance_id == "instance"
+    assert client.create(
+        model="json", client_host="pi", compatibility_scope="a" * 64
+    ).instance_id == "instance"
+    assert requests[-2][2] == {"sequence_id": None, "model": "language"}
+    assert requests[-1][2]["client"] == {
+        "kind": "agent-harness",
+        "host": "pi",
+        "compatibilityScope": "a" * 64,
+    }
+    with pytest.raises(ValueError):
+        client.create(model="json")
 
 
 def test_plain_text_training_sequence_download_and_ingestion():
