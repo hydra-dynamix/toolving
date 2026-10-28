@@ -3,8 +3,13 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
-## Unreleased
+## 0.13.0 (2026-10-28)
 
+- Conceiver: create an instance from a retired artifact with `create(artifact_id=...)`; new instances otherwise start empty.
+- Conceiver: list stored artifacts and pin or unpin them (`artifacts()`, `pin_artifact()`, `unpin_artifact()`); pinned artifacts are never overwritten when storage is full.
+- Conceiver: retirement results carry `purpose`, `rotated_sequence_ids` and `skipped` (`"NOTHING_TAUGHT"` when nothing was kept).
+- Conceiver: a create whose key had already created an instance that has since retired returns a new instance with `replaced`, `replaced_instance_id` and `replaced_operation_id`.
+- This repository is the single source of the SDK; toolving-api ships a copy of this release.
 - Discover available hosted models and explicitly select language or compatibility-scoped JSON instances.
 - Read account storage availability and bounded usage from the agent API.
 - List saved training sequences, optionally filtered by model.

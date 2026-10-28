@@ -55,6 +55,9 @@ class Retirement:
     retired: bool
     sequence_id: str | None
     artifact: Artifact | None
+    purpose: Literal["manual", "retirement", "automatic-recovery"] | None = None
+    rotated_sequence_ids: tuple[str, ...] = ()
+    skipped: str | None = None  # "NOTHING_TAUGHT": no sequence or artifact was kept
 
 
 class ConceiverClient:
@@ -115,9 +118,13 @@ class ConceiverClient:
         model: Literal["language", "json"] | None = None,
         client_host: Literal["pi", "codex", "claude-code"] | None = None,
         compatibility_scope: str | None = None,
+        artifact_id: str | None = None,
         key: str | None = None,
     ) -> "ConceiverInstance":
         body: dict[str, Any] = {"sequence_id": sequence_id}
+        if artifact_id is not None:
+            # Load a language artifact retired by an earlier instance; new instances otherwise start empty.
+            body["artifact_id"] = artifact_id
         if model == "json":
             if client_host is None or compatibility_scope is None:
                 raise ValueError("JSON model selection requires client_host and compatibility_scope")
@@ -139,10 +146,30 @@ class ConceiverClient:
         elif client_host is not None or compatibility_scope is not None:
             raise ValueError("select the JSON model before supplying its client scope")
         receipt = self._request("POST", "/v1/instances", body, key)
-        return self.instance(receipt["result"]["instance_id"])
+        result = receipt["result"]
+        # Repeating a create with the same key returns the same instance while it is live. If that
+        # instance has retired, the service starts a new one and flags it as a replacement.
+        return ConceiverInstance(
+            self,
+            result["instance_id"],
+            replaced=result.get("replaced") is True,
+            replaced_instance_id=result.get("replaced_instance_id"),
+            replaced_operation_id=result.get("replaced_operation_id"),
+        )
 
     def instance(self, identity: str) -> "ConceiverInstance":
         return ConceiverInstance(self, identity)
+
+    def artifacts(self, *, limit: int = 50, offset: int = 0) -> dict[str, Any]:
+        """Stored artifacts, newest first, each with whether it is pinned."""
+        return self._request("GET", f"/v1/artifacts?limit={limit}&offset={offset}")
+
+    def pin_artifact(self, artifact_id: str) -> dict[str, Any]:
+        """Keep an artifact: a pinned artifact is never evicted when storage is full."""
+        return self._request("PUT", "/v1/artifacts/" + quote(artifact_id, safe="") + "/pin")
+
+    def unpin_artifact(self, artifact_id: str) -> dict[str, Any]:
+        return self._request("DELETE", "/v1/artifacts/" + quote(artifact_id, safe="") + "/pin")
 
     def operation(self, identity: str) -> dict[str, Any]:
         return self._request("GET", "/v1/operations/" + quote(identity, safe=""))
@@ -179,6 +206,11 @@ class ConceiverClient:
 class ConceiverInstance:
     client: ConceiverClient
     instance_id: str
+    # Set by create() when its idempotency key had already created an instance that has since retired:
+    # a new instance was started instead, and these name the retired instance and its original create.
+    replaced: bool = False
+    replaced_instance_id: str | None = None
+    replaced_operation_id: str | None = None
 
     @property
     def _path(self) -> str:
@@ -263,4 +295,7 @@ class ConceiverInstance:
             None
             if artifact is None
             else Artifact(artifact["format"], artifact["sha256"], artifact["bytes"]),
+            result.get("purpose"),
+            tuple(result.get("rotated_sequence_ids", ())),
+            result.get("skipped"),
         )

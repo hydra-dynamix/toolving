@@ -9,7 +9,7 @@ See the [customer changelog](CHANGELOG.md) for release updates.
 Download the wheel from the [Toolving releases page](https://github.com/hydra-dynamix/toolving/releases), verify the published SHA-256 checksum, then install it:
 
 ```sh
-python -m pip install toolving-0.12.1-py3-none-any.whl
+python -m pip install toolving-0.13.0-py3-none-any.whl
 ```
 
 Python 3.10 or later is required.
@@ -67,7 +67,7 @@ Final retirement on an account with storage returns checksum-verified artifact m
 
 ## Recovery
 
-Every mutation has an idempotency key. The SDK creates one when `key` is omitted. Supply and retain your own key when a request may need recovery. Repeating the same request with the same key returns the original operation result without repeating learning or charging. `client.operation(operation_id)` reads an accepted operation after response loss.
+Every mutation has an idempotency key. The SDK creates one when `key` is omitted. Supply and retain your own key when a request may need recovery. Repeating the same request with the same key returns the original operation result without repeating learning or charging. Creates are the one exception: a repeated create returns the same instance while it is live, but once that instance has retired the service starts a new one, and the returned instance has `replaced=True` with `replaced_instance_id` and `replaced_operation_id`. Use a new key for each create you mean to be new. `client.operation(operation_id)` reads an accepted operation after response loss.
 
 Questions and answers are single-line strings. Raw JSON syntax support within Conceiver's taught language is in active development. A JSON-encoded answer can still be carried as text and decoded by the SDK.
 
