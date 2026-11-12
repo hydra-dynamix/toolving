@@ -5,7 +5,7 @@ Releases page (`/releases`) for its version.
 
 ## 0.14.0 (2026-11-12)
 
-- Conceiver 2.0: predictions accept the confidence `highly confident` (the trie model's words are `hypothesis`, `confident` and `highly confident`). `high` is still accepted for Conceiver 1.x results.
+- Conceiver 2.0: predictions accept the confidence `highly confident`. `high` is still accepted for Conceiver 1.x results.
 
 ## 0.13.0 (2026-10-28)
 
