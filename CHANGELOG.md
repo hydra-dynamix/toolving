@@ -3,6 +3,10 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
+## 0.14.0 (2026-11-12)
+
+- Conceiver 2.0: predictions accept the confidence `highly confident` (the trie model's words are `hypothesis`, `confident` and `highly confident`). `high` is still accepted for Conceiver 1.x results.
+
 ## 0.13.0 (2026-10-28)
 
 - Conceiver: create an instance from a retired artifact with `create(artifact_id=...)`; new instances otherwise start empty.

@@ -9,7 +9,7 @@ See the [customer changelog](CHANGELOG.md) for release updates.
 Download the wheel from the [Toolving releases page](https://github.com/hydra-dynamix/toolving/releases), verify the published SHA-256 checksum, then install it:
 
 ```sh
-python -m pip install toolving-0.13.0-py3-none-any.whl
+python -m pip install toolving-0.14.0-py3-none-any.whl
 ```
 
 Python 3.10 or later is required.
@@ -61,7 +61,7 @@ with ConceiverClient(api_url, account_api_key) as client:
 
 `client.models()` lists selectable hosted models. JSON selection also requires `client_host` and a 64-character hexadecimal `compatibility_scope`. `client.storage()` reports whether durable account storage is enabled and its bounded usage.
 
-`instance.training_sequence()` assembles current training text without storing it, so Free accounts can copy and manage sequences locally. `save()` requires account storage. Saved training sequences are UTF-8 `.txt` files. Each teaching uses one question line and one answer line; one empty line separates teachings. `ingest_training_sequence()` validates this format and sends each pair through normal teaching. A standard query costs 1 credit. `with_memory=True` requests complete relevant teaching episodes and costs 2 credits. Teaching costs 5 credits. Conceiver returns `hypothesis`, `confident`, or `high` as evidence levels, not probability percentages. Always check `status` before using an answer.
+`instance.training_sequence()` assembles current training text without storing it, so Free accounts can copy and manage sequences locally. `save()` requires account storage. Saved training sequences are UTF-8 `.txt` files. Each teaching uses one question line and one answer line; one empty line separates teachings. `ingest_training_sequence()` validates this format and sends each pair through normal teaching. A standard query costs 1 credit. `with_memory=True` requests complete relevant teaching episodes and costs 2 credits. Teaching costs 5 credits. Conceiver returns `hypothesis`, `confident`, or `highly confident` as evidence levels (Conceiver 1.x said `high`), not probability percentages. Always check `status` before using an answer.
 
 Final retirement on an account with storage returns checksum-verified artifact metadata. Final retirement without storage returns `persisted=False` and discards live memory. Reaping one of several active instances does not retire the shared account state.
 

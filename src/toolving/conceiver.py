@@ -36,7 +36,7 @@ class TextPrediction:
     status: str
     text: str | None = None
     output: Any = None
-    confidence: Literal["hypothesis", "confident", "high"] | None = None
+    confidence: Literal["hypothesis", "confident", "highly confident", "high"] | None = None
     evidence: PredictionEvidence | None = None
 
 
