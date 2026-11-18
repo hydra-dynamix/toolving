@@ -1,66 +1,71 @@
-"""toolving-playground: a local browser UI for the hosted learner API.
+"""toolving-playground: a local browser UI for writing training sequences and
+teaching them to a local Conceiver build.
 
-    toolving-playground                  # uses TOOLVING_API_URL / TOOLVING_API_KEY
+    toolving-playground --conceiver ~/repos/conceiver/conceiver   # or TOOLVING_CONCEIVER
     toolving-playground --port 8766 --no-browser
+    toolving-inspector --conceiver ...                            # opens the inspector page
 
-The page talks only to this local process. The process holds the API key and
-forwards an allowlisted set of API calls, using the SDK client's auth,
-idempotency keys, and retries. It listens on loopback only. Every call must
-carry the per-launch token from the printed URL, and the Host header must be
-the loopback address, so other websites open in the same browser cannot use
-the key.
+Two pages share one process and so one Conceiver trie:
+- `/`, the playground: a sequence editor whose sequence is taught to Conceiver
+  line by line (each line asked first, then taught), and the assistant panel,
+  an LLM chat that helps write the sequence (agent.py; it runs through agentctl);
+- `/inspect`, the inspector: ask a line and read its answer, steps and +/-
+  evidence, teach a correction, and read what the loaded trie holds.
 
-The assistant panel (POST /api/agent/chat) is an LLM chat that helps write a
-training sequence; see agent.py. It needs ANTHROPIC_API_KEY and the optional
-`anthropic` package (`pip install 'toolving[agent]'`).
+Conceiver is the Rust `conceiver` crate; conceiver.py builds a driver for it
+and keeps it running. The process listens on loopback only. Every API call
+must carry the per-launch token from the printed URL, and the Host header must
+be the loopback address, so other websites open in the same browser cannot
+drive it.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
+import os
 import secrets
 import sys
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
+from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from .. import __version__
-from ..client import LearnerClient
-from ..errors import LearnerAPIError
-from .agent import AgentError, SequenceAgent, agent_from_env
+from .agent import AgentError, SequenceAgent, SequenceError, agent_from_env, validate_sequence
+from .conceiver import Conceiver, ConceiverError, run_session
 
-_NAME = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}"
-_ID = r"[A-Za-z0-9_-]{1,128}"
-# (method, path under /v1/) that the page may call.
-_ALLOWED = [
-    ("GET", re.compile(r"learners")),
-    ("GET", re.compile(r"meta/version")),
-    ("GET", re.compile(rf"learners/{_NAME}")),
-    ("POST", re.compile(r"learners")),
-    ("POST", re.compile(rf"learners/{_NAME}/(predict|teach|remember|recall|forks|training|memory/maintain)")),
-    ("POST", re.compile(rf"learners/{_NAME}/predictions/{_ID}/(teach|outcome)")),
-    ("PUT", re.compile(rf"learners/{_NAME}/mode")),
-]
 _ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
+    "/inspect": ("inspect.html", "text/html; charset=utf-8"),
+    "/common.js": ("common.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/inspect.js": ("inspect.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 
 
-def _allowed(method: str, path: str) -> bool:
-    return any(method == m and pattern.fullmatch(path) for m, pattern in _ALLOWED)
+class _Refused(Exception):
+    def __init__(self, status: int, code: str, message: str):
+        super().__init__(message)
+        self.status, self.code, self.message = status, code, message
 
 
-def build_handler(client: LearnerClient, token: str, port_holder: dict[str, int],
+def _text(body: dict[str, Any], field: str) -> str:
+    value = body.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise _Refused(400, "INVALID_REQUEST", f"{field} must be non-empty text.")
+    return value.strip()
+
+
+def build_handler(token: str, port_holder: dict[str, int], *,
+                  conceiver: Any = None, conceiver_unavailable: str = "No Conceiver build is configured.",
                   agent: SequenceAgent | None = None, agent_unavailable: str = "The assistant is not configured."):
+    """`conceiver` is a conceiver.Conceiver, or anything with its ask / teach / state / reset."""
     static = resources.files(__package__).joinpath("static")
-    key_id = (client.api_key or "").split("_")[1] if (client.api_key or "").count("_") >= 2 else "?"
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "toolving-playground"
@@ -89,115 +94,127 @@ def build_handler(client: LearnerClient, token: str, port_holder: dict[str, int]
             return secrets.compare_digest(self.headers.get("X-Playground-Token", ""), token)
 
         def do_GET(self):
-            path = urlsplit(self.path).path
-            if path.startswith("/api/"):
-                return self.api("GET", path)
-            asset = _ASSETS.get(path)
+            url = urlsplit(self.path)
+            if url.path.startswith("/api/"):
+                return self.api("GET", url.path, parse_qs(url.query))
+            asset = _ASSETS.get(url.path)
             if asset is None:
                 return self.send(404, b"Not found", "text/plain")
             return self.send(200, static.joinpath(asset[0]).read_bytes(), asset[1])
 
         def do_POST(self):
-            self.api("POST", urlsplit(self.path).path)
+            self.api("POST", urlsplit(self.path).path, {})
 
-        def do_PUT(self):
-            self.api("PUT", urlsplit(self.path).path)
-
-        def api(self, method: str, path: str) -> None:
-            if not self.trusted():
-                return self.send_json(403, {"error": {"code": "FORBIDDEN", "message": "Missing or wrong playground token; reopen the URL printed by toolving-playground."}})
-            if path == "/api/session":
-                assistant = {"available": True, "model": agent.model} if agent else {"available": False, "reason": agent_unavailable}
-                return self.send_json(200, {"base_url": client.base_url, "key_id": key_id, "sdk_version": __version__,
-                                            "assistant": assistant})
-            if method == "POST" and path == "/api/agent/chat":
-                return self.agent_chat()
-            target = path[len("/api/"):]
-            if not _allowed(method, target):
-                return self.send_json(404, {"error": {"code": "NOT_ALLOWED", "message": f"{method} /{target} is not available in the playground."}})
-            body = None
-            if method != "GET":
-                body = self.read_json()
-                if body is None:
-                    return self.send_json(400, {"error": {"code": "INVALID_REQUEST", "message": "Body must be JSON."}})
-            try:
-                result = client._request(method, "/v1/" + target, body)
-            except LearnerAPIError as failure:
-                return self.send_json(
-                    failure.status or 502,
-                    {"error": {"code": failure.code, "message": failure.message, "reason": failure.reason,
-                               "request_id": failure.request_id, "retryable": failure.retryable}},
-                )
-            except Exception as failure:  # network or unexpected; shown in the page
-                return self.send_json(502, {"error": {"code": "UNREACHABLE", "message": f"{type(failure).__name__}: {failure}"}})
-            return self.send_json(200, result)
-
-        def read_json(self) -> Any:
-            """The request body as JSON ({} when empty), or None when it is not JSON."""
+        def read_json(self) -> dict[str, Any]:
             length = int(self.headers.get("Content-Length") or 0)
             try:
-                return json.loads(self.rfile.read(length) or b"{}")
+                body = json.loads(self.rfile.read(length) or b"{}")
             except json.JSONDecodeError:
-                return None
-
-        def agent_chat(self) -> None:
-            if agent is None:
-                return self.send_json(503, {"error": {"code": "AGENT_UNAVAILABLE", "message": agent_unavailable}})
-            body = self.read_json()
+                body = None
             if not isinstance(body, dict):
-                return self.send_json(400, {"error": {"code": "INVALID_REQUEST", "message": "Body must be a JSON object."}})
+                raise _Refused(400, "INVALID_REQUEST", "Body must be a JSON object.")
+            return body
+
+        def api(self, method: str, path: str, query: dict[str, list[str]]) -> None:
+            if not self.trusted():
+                return self.send_json(403, {"error": {"code": "FORBIDDEN", "message": "Missing or wrong playground token; reopen the URL printed by toolving-playground."}})
             try:
-                return self.send_json(200, agent.reply(body.get("messages")))
-            except AgentError as failure:
-                return self.send_json(failure.status, {"error": {"code": failure.code, "message": failure.message}})
+                return self.send_json(200, self.route(method, path, query))
+            except _Refused as failure:
+                status, code, message = failure.status, failure.code, failure.message
+            except (AgentError, ConceiverError) as failure:
+                status, code, message = failure.status, failure.code, failure.message
+            except SequenceError as failure:
+                status, code, message = 400, "INVALID_SEQUENCE", str(failure)
+            return self.send_json(status, {"error": {"code": code, "message": message}})
+
+        def route(self, method: str, path: str, query: dict[str, list[str]]) -> Any:
+            if (method, path) == ("GET", "/api/session"):
+                return {
+                    "sdk_version": __version__,
+                    "conceiver": {"available": True, "crate": str(getattr(conceiver, "crate", "") or "")}
+                    if conceiver else {"available": False, "reason": conceiver_unavailable},
+                    "assistant": {"available": True, "label": agent.label}
+                    if agent else {"available": False, "reason": agent_unavailable},
+                }
+            if (method, path) == ("POST", "/api/agent/chat"):
+                if agent is None:
+                    raise _Refused(503, "AGENT_UNAVAILABLE", agent_unavailable)
+                return agent.reply(self.read_json().get("messages"))
+            if path.startswith("/api/conceiver/"):
+                if conceiver is None:
+                    raise _Refused(503, "CONCEIVER_UNAVAILABLE", conceiver_unavailable)
+                action = (method, path[len("/api/conceiver/"):])
+                if action == ("GET", "state"):
+                    newest = (query.get("newest") or ["50"])[0]
+                    return conceiver.state(int(newest) if newest.isdigit() else 50)
+                if action == ("POST", "ask"):
+                    return conceiver.ask(_text(self.read_json(), "line"))
+                if action == ("POST", "teach"):
+                    body = self.read_json()
+                    return conceiver.teach(_text(body, "question"), _text(body, "answer"))
+                if action == ("POST", "session"):
+                    sequence = validate_sequence(self.read_json().get("pairs"))
+                    return run_session(conceiver, sequence.pairs)
+                if action == ("POST", "reset"):
+                    return conceiver.reset()
+            raise _Refused(404, "NOT_FOUND", f"{method} {path} is not available.")
 
     return Handler
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="toolving-playground", description="Local browser UI for the hosted learner API.")
-    parser.add_argument("--url", help="API base URL (default: TOOLVING_API_URL)")
-    parser.add_argument("--api-key", help="API key (default: TOOLVING_API_KEY)")
+def main(argv: list[str] | None = None, *, page: str = "/") -> int:
+    parser = argparse.ArgumentParser(prog="toolving-playground", description="Local browser UI for teaching a local Conceiver build.")
+    parser.add_argument("--conceiver", default=os.environ.get("TOOLVING_CONCEIVER"),
+                        help="the conceiver crate folder, holding its Cargo.toml (default: TOOLVING_CONCEIVER)")
+    parser.add_argument("--agentctl", help="agentctl executable for the assistant (default: agentctl on PATH)")
+    parser.add_argument("--agent", default="claude", help="the agentctl agent the assistant runs (default: claude)")
     parser.add_argument("--port", type=int, default=8766, help="local port (0 = any free port)")
-    parser.add_argument("--agent-model", help="model for the assistant panel (default: TOOLVING_AGENT_MODEL or claude-opus-5-5)")
     parser.add_argument("--no-browser", action="store_true", help="print the URL without opening a browser")
     args = parser.parse_args(argv)
-    try:
-        client = LearnerClient(base_url=args.url, api_key=args.api_key)
-        client.version()
-    except ValueError as failure:
-        print(f"toolving-playground: {failure}", file=sys.stderr)
-        return 2
-    except LearnerAPIError as failure:
-        print(f"toolving-playground: the API rejected the key or is unavailable: {failure}", file=sys.stderr)
-        return 2
-    except Exception as failure:
-        print(f"toolving-playground: cannot reach {client.base_url if 'client' in locals() else args.url}: {failure}", file=sys.stderr)
-        return 2
-    agent, agent_unavailable = agent_from_env(args.agent_model)
+
+    conceiver: Conceiver | None = None
+    conceiver_unavailable = "Start with --conceiver (or TOOLVING_CONCEIVER) set to the conceiver crate folder."
+    if args.conceiver:
+        print(f"Building the Conceiver driver against {args.conceiver} …", flush=True)
+        try:
+            conceiver = Conceiver.build(Path(args.conceiver))
+        except (ConceiverError, OSError) as failure:
+            conceiver_unavailable = getattr(failure, "message", str(failure))
+            print(f"toolving-playground: Conceiver is off: {conceiver_unavailable}", file=sys.stderr)
+    agent, agent_unavailable = agent_from_env(args.agentctl, args.agent)
+
     token = secrets.token_urlsafe(24)
     port_holder: dict[str, int] = {}
+    handler = build_handler(token, port_holder, conceiver=conceiver, conceiver_unavailable=conceiver_unavailable,
+                            agent=agent, agent_unavailable=agent_unavailable)
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port),
-                                     build_handler(client, token, port_holder, agent, agent_unavailable))
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     except OSError as failure:
         print(f"toolving-playground: cannot listen on 127.0.0.1:{args.port} ({failure.strerror}); "
               "pick another with --port, or --port 0 for any free port", file=sys.stderr)
         return 2
     port_holder["port"] = server.server_address[1]
-    url = f"http://127.0.0.1:{port_holder['port']}/#t={token}"
-    assistant = f"Assistant: {agent.model}" if agent else f"Assistant off: {agent_unavailable}"
-    print(f"Learner playground for {client.base_url}\n  {url}\n{assistant}\nCtrl+C to stop.", flush=True)
+    base = f"http://127.0.0.1:{port_holder['port']}"
+    print(f"Playground  {base}/#t={token}\nInspector   {base}/inspect#t={token}\n"
+          f"Conceiver: {conceiver.crate if conceiver else 'off'}\n"
+          f"Assistant: {agent.label if agent else 'off: ' + agent_unavailable}\nCtrl+C to stop.", flush=True)
     if not args.no_browser:
-        threading.Timer(0.3, webbrowser.open, (url,)).start()
+        threading.Timer(0.3, webbrowser.open, (f"{base}{page}#t={token}",)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
         server.server_close()
-        client.close()
+        if conceiver:
+            conceiver.close()
     return 0
+
+
+def inspector_main(argv: list[str] | None = None) -> int:
+    """toolving-inspector: the same local server, opening the inspector page."""
+    return main(argv, page="/inspect")
 
 
 if __name__ == "__main__":

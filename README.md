@@ -73,4 +73,15 @@ Questions and answers are single-line strings. Raw JSON syntax support within Co
 
 ## Earlier API compatibility
 
-`LearnerClient` and the local playground remain in this wheel for deployments using the earlier API. New Conceiver integrations should use `ConceiverClient`.
+`LearnerClient` remains in this wheel for deployments using the earlier API. New Conceiver integrations should use `ConceiverClient`.
+
+## Local playground and inspector
+
+`toolving-playground` is a local browser UI for writing training sequences and teaching them to a local Conceiver build (the Rust `conceiver` crate). It needs `cargo` and `rustc`; it compiles a small driver against the crate when it starts.
+
+```sh
+toolving-playground --conceiver path/to/conceiver/conceiver   # or set TOOLVING_CONCEIVER
+toolving-inspector --conceiver path/to/conceiver/conceiver    # the same server, opening the inspector
+```
+
+The playground teaches a sequence line by line: each line is asked first, then its answer is taught, and every answer shows its steps and evidence. Its assistant panel is a chat that asks about your problem and proposes a sequence; it runs through `agentctl run claude`, so `agentctl` must be on `PATH` (or pass `--agentctl`). The inspector, at `/inspect` on the same server and so on the same trie, asks single lines, teaches corrections, and lists what the trie holds. Both listen on loopback only.

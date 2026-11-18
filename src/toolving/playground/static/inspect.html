@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conceiver inspector</title><script>try{var t=localStorage.getItem("playground-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <strong class="brand">Conceiver inspector</strong>
+  <span id="session" class="muted">connecting…</span>
+  <div class="learner-bar">
+    <a class="button" href="/" target="_blank" rel="noopener">Playground</a>
+    <button id="reset" type="button" title="Load a fresh trie: everything taught is dropped">Reset trie</button>
+    <button id="theme" type="button" title="Theme: follow the system, dark, or light">◐ System</button>
+  </div>
+</header>
+<div id="error" role="alert" hidden></div>
+<div class="layout">
+  <main>
+    <div id="messages" aria-live="polite"><p class="empty muted" id="empty">Ask a line to see Conceiver's answer, the steps that produced it and their evidence (+for −against). Correct it to teach the right answer.</p></div>
+    <form id="composer" autocomplete="off">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="ask" class="on">Ask</button>
+        <button type="button" role="tab" data-tab="teach">Teach</button>
+      </div>
+      <div data-pane="ask">
+        <textarea id="ask-input" rows="2" placeholder="A line to ask — e.g. file parks minutes 2027"></textarea>
+        <div class="row"><small class="muted">Enter to send · Shift+Enter for a new line · asking records the line</small><button type="submit">Ask</button></div>
+      </div>
+      <div data-pane="teach" hidden>
+        <div class="pair"><input id="teach-input" placeholder="Line — e.g. file council minutes 2025"><span>→</span><input id="teach-output" placeholder="Answer — e.g. records/council/2025"></div>
+        <div class="row"><small class="muted">Teaches the answer on the line's own receipt.</small><button type="submit">Teach</button></div>
+      </div>
+    </form>
+  </main>
+  <aside>
+    <section>
+      <h2>Trie</h2>
+      <div class="row"><button id="refresh" type="button">Refresh</button><label>Newest <select id="newest"><option>20</option><option selected>50</option><option>200</option></select> log entries</label></div>
+      <dl id="trie-counts" class="counts"></dl>
+      <h3>Taught this session</h3>
+      <ol id="taught" class="taught"></ol>
+      <h3>Log, newest first</h3>
+      <table id="log" class="log"><thead><tr><th>place</th><th>side</th><th>episode</th><th>at</th></tr></thead><tbody></tbody></table>
+    </section>
+    <section>
+      <h2>Activity</h2>
+      <ol id="activity" reversed></ol>
+    </section>
+  </aside>
+</div>
+<script src="/common.js"></script>
+<script src="/inspect.js"></script>
+</body>
+</html>
