@@ -12,6 +12,7 @@
     <label>Learner <select id="learner" aria-label="Learner"></select></label>
     <button id="new-learner" type="button">New</button>
     <button id="fork-learner" type="button">Fork</button>
+    <button id="assistant-toggle" type="button" aria-expanded="false" aria-controls="assistant" title="Chat with an assistant that helps write a training sequence">Assistant</button>
     <button id="theme" type="button" title="Theme: follow the system, dark, or light">◐ System</button>
     <label>Mode <select id="mode" aria-label="Mode"><option value="LEARNING">Learning</option><option value="PREDICTION_ONLY">Prediction only</option></select></label>
   </div>
@@ -56,6 +57,15 @@
       <ol id="activity" reversed></ol>
     </section>
   </aside>
+  <section id="assistant" aria-label="Training-sequence assistant" hidden>
+    <div class="assistant-head"><h2>Sequence assistant</h2><span id="assistant-model" class="muted"></span>
+      <button id="assistant-reset" type="button" title="Start a new conversation">New</button><button id="assistant-close" type="button" aria-label="Close the assistant">✕</button></div>
+    <div id="assistant-log" aria-live="polite"><p class="muted" id="assistant-empty">Describe what you want Conceiver to answer. The assistant asks about your problem, then proposes a training sequence you can load into the Batch editor.</p></div>
+    <form id="assistant-form" autocomplete="off">
+      <textarea id="assistant-input" rows="3" placeholder="What should Conceiver learn to answer?"></textarea>
+      <div class="row"><small class="muted">Enter to send · Shift+Enter for a new line</small><button type="submit" id="assistant-send">Send</button></div>
+    </form>
+  </section>
 </div>
 <script src="/app.js"></script>
 </body>

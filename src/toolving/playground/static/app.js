@@ -224,6 +224,87 @@ async function maintain() {
   $("recall-output").hidden = false;
 }
 
+// Sequence assistant: an LLM chat that asks about the user's problem and proposes a
+// training sequence. The page holds the conversation and sends it whole each turn;
+// assistant turns go back as the raw JSON the model returned.
+let conversation = [];
+let assistantStatus = null;  // from /api/session
+
+function assistantSays(node) {
+  $("assistant-empty")?.remove();
+  $("assistant-log").append(node);
+  node.scrollIntoView({ block: "end", behavior: "smooth" });
+}
+
+function selectTab(name) {
+  document.querySelector(`.tabs button[data-tab="${name}"]`).click();
+}
+
+// A proposed sequence, checked by the server against the training-sequence format.
+function proposalCard(sequence) {
+  const count = sequence.pairs.length;
+  const load = el("button", { type: "button", class: "primary", onclick: () => {
+    $("batch-input").value = sequence.text;
+    selectTab("batch");
+    $("batch-input").focus();
+    load.textContent = "✓ Loaded into Batch";
+  } }, "Load into Batch editor");
+  return el("div", { class: "msg card proposal" },
+    el("span", { class: "label" }, `Proposed training sequence · ${count} teaching${count === 1 ? "" : "s"}`),
+    el("pre", { class: "evidence" }, sequence.text),
+    el("div", { class: "actions" }, load));
+}
+
+async function askAssistant() {
+  const text = $("assistant-input").value.trim();
+  if (!text) return;
+  assistantSays(el("div", { class: "msg you" }, text));
+  $("assistant-input").value = "";
+  $("assistant-send").disabled = true;
+  const pending = el("div", { class: "muted" }, "Thinking…");
+  assistantSays(pending);
+  const turn = [...conversation, { role: "user", content: text }];
+  try {
+    const result = await api("POST", "agent/chat", { messages: turn });
+    conversation = [...turn, { role: "assistant", content: result.raw }];
+    pending.replaceWith(el("div", { class: "msg agent" }, result.reply));
+    if (result.sequence) assistantSays(proposalCard(result.sequence));
+    if (result.sequence_error) {
+      assistantSays(el("div", { class: "msg card proposal" }, el("div", { class: "result bad" },
+        `The proposed sequence is not a valid training sequence (${result.sequence_error}). Ask the assistant to fix it.`)));
+    }
+  } catch {
+    pending.remove();
+    $("assistant-input").value = text;  // nothing was added to the conversation; send it again
+  } finally {
+    $("assistant-send").disabled = false;
+  }
+}
+
+function resetAssistant() {
+  conversation = [];
+  $("assistant-log").replaceChildren(el("p", { class: "muted", id: "assistant-empty" },
+    "Describe what you want Conceiver to answer. The assistant asks about your problem, then proposes a training sequence you can load into the Batch editor."));
+  showAssistantStatus(assistantStatus);
+}
+
+function toggleAssistant(open) {
+  $("assistant").hidden = !open;
+  document.body.classList.toggle("assistant-open", open);
+  $("assistant-toggle").setAttribute("aria-expanded", String(open));
+  $("assistant-toggle").classList.toggle("on", open);
+  if (open) $("assistant-input").focus();
+}
+
+function showAssistantStatus(assistant) {
+  assistantStatus = assistant;
+  const available = assistant?.available;
+  $("assistant-model").textContent = available ? assistant.model : "";
+  $("assistant-input").disabled = !available;
+  $("assistant-send").disabled = !available;
+  if (!available) $("assistant-empty").textContent = assistant?.reason || "The assistant is not available.";
+}
+
 // Theme: System (follows the OS) → Dark → Light, remembered per browser.
 const THEMES = ["system", "dark", "light"];
 const THEME_LABELS = { system: "◐ System", dark: "● Dark", light: "○ Light" };
@@ -263,6 +344,13 @@ function wire() {
   $("remember").addEventListener("click", () => remember().catch(() => {}));
   $("recall").addEventListener("click", () => recall().catch(() => {}));
   $("maintain").addEventListener("click", () => maintain().catch(() => {}));
+  $("assistant-toggle").addEventListener("click", () => toggleAssistant($("assistant").hidden));
+  $("assistant-close").addEventListener("click", () => toggleAssistant(false));
+  $("assistant-reset").addEventListener("click", resetAssistant);
+  $("assistant-form").addEventListener("submit", (event) => { event.preventDefault(); askAssistant(); });
+  $("assistant-input").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); askAssistant(); }
+  });
 }
 
 (async () => {
@@ -271,6 +359,7 @@ function wire() {
   try {
     const session = await api("GET", "session");
     $("session").textContent = `${session.base_url} · key ${session.key_id}`;
+    showAssistantStatus(session.assistant);
     await loadLearners();
   } catch { /* shown */ }
 })();

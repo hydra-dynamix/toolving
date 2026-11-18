@@ -9,6 +9,10 @@ idempotency keys, and retries. It listens on loopback only. Every call must
 carry the per-launch token from the printed URL, and the Host header must be
 the loopback address, so other websites open in the same browser cannot use
 the key.
+
+The assistant panel (POST /api/agent/chat) is an LLM chat that helps write a
+training sequence; see agent.py. It needs ANTHROPIC_API_KEY and the optional
+`anthropic` package (`pip install 'toolving[agent]'`).
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ from urllib.parse import urlsplit
 from .. import __version__
 from ..client import LearnerClient
 from ..errors import LearnerAPIError
+from .agent import AgentError, SequenceAgent, agent_from_env
 
 _NAME = r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}"
 _ID = r"[A-Za-z0-9_-]{1,128}"
@@ -52,7 +57,8 @@ def _allowed(method: str, path: str) -> bool:
     return any(method == m and pattern.fullmatch(path) for m, pattern in _ALLOWED)
 
 
-def build_handler(client: LearnerClient, token: str, port_holder: dict[str, int]):
+def build_handler(client: LearnerClient, token: str, port_holder: dict[str, int],
+                  agent: SequenceAgent | None = None, agent_unavailable: str = "The assistant is not configured."):
     static = resources.files(__package__).joinpath("static")
     key_id = (client.api_key or "").split("_")[1] if (client.api_key or "").count("_") >= 2 else "?"
 
@@ -101,16 +107,18 @@ def build_handler(client: LearnerClient, token: str, port_holder: dict[str, int]
             if not self.trusted():
                 return self.send_json(403, {"error": {"code": "FORBIDDEN", "message": "Missing or wrong playground token; reopen the URL printed by toolving-playground."}})
             if path == "/api/session":
-                return self.send_json(200, {"base_url": client.base_url, "key_id": key_id, "sdk_version": __version__})
+                assistant = {"available": True, "model": agent.model} if agent else {"available": False, "reason": agent_unavailable}
+                return self.send_json(200, {"base_url": client.base_url, "key_id": key_id, "sdk_version": __version__,
+                                            "assistant": assistant})
+            if method == "POST" and path == "/api/agent/chat":
+                return self.agent_chat()
             target = path[len("/api/"):]
             if not _allowed(method, target):
                 return self.send_json(404, {"error": {"code": "NOT_ALLOWED", "message": f"{method} /{target} is not available in the playground."}})
             body = None
             if method != "GET":
-                length = int(self.headers.get("Content-Length") or 0)
-                try:
-                    body = json.loads(self.rfile.read(length) or b"{}")
-                except json.JSONDecodeError:
+                body = self.read_json()
+                if body is None:
                     return self.send_json(400, {"error": {"code": "INVALID_REQUEST", "message": "Body must be JSON."}})
             try:
                 result = client._request(method, "/v1/" + target, body)
@@ -124,6 +132,25 @@ def build_handler(client: LearnerClient, token: str, port_holder: dict[str, int]
                 return self.send_json(502, {"error": {"code": "UNREACHABLE", "message": f"{type(failure).__name__}: {failure}"}})
             return self.send_json(200, result)
 
+        def read_json(self) -> Any:
+            """The request body as JSON ({} when empty), or None when it is not JSON."""
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                return json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                return None
+
+        def agent_chat(self) -> None:
+            if agent is None:
+                return self.send_json(503, {"error": {"code": "AGENT_UNAVAILABLE", "message": agent_unavailable}})
+            body = self.read_json()
+            if not isinstance(body, dict):
+                return self.send_json(400, {"error": {"code": "INVALID_REQUEST", "message": "Body must be a JSON object."}})
+            try:
+                return self.send_json(200, agent.reply(body.get("messages")))
+            except AgentError as failure:
+                return self.send_json(failure.status, {"error": {"code": failure.code, "message": failure.message}})
+
     return Handler
 
 
@@ -132,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--url", help="API base URL (default: TOOLVING_API_URL)")
     parser.add_argument("--api-key", help="API key (default: TOOLVING_API_KEY)")
     parser.add_argument("--port", type=int, default=8766, help="local port (0 = any free port)")
+    parser.add_argument("--agent-model", help="model for the assistant panel (default: TOOLVING_AGENT_MODEL or claude-opus-5-5)")
     parser.add_argument("--no-browser", action="store_true", help="print the URL without opening a browser")
     args = parser.parse_args(argv)
     try:
@@ -146,17 +174,20 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as failure:
         print(f"toolving-playground: cannot reach {client.base_url if 'client' in locals() else args.url}: {failure}", file=sys.stderr)
         return 2
+    agent, agent_unavailable = agent_from_env(args.agent_model)
     token = secrets.token_urlsafe(24)
     port_holder: dict[str, int] = {}
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), build_handler(client, token, port_holder))
+        server = ThreadingHTTPServer(("127.0.0.1", args.port),
+                                     build_handler(client, token, port_holder, agent, agent_unavailable))
     except OSError as failure:
         print(f"toolving-playground: cannot listen on 127.0.0.1:{args.port} ({failure.strerror}); "
               "pick another with --port, or --port 0 for any free port", file=sys.stderr)
         return 2
     port_holder["port"] = server.server_address[1]
     url = f"http://127.0.0.1:{port_holder['port']}/#t={token}"
-    print(f"Learner playground for {client.base_url}\n  {url}\nCtrl+C to stop.", flush=True)
+    assistant = f"Assistant: {agent.model}" if agent else f"Assistant off: {agent_unavailable}"
+    print(f"Learner playground for {client.base_url}\n  {url}\n{assistant}\nCtrl+C to stop.", flush=True)
     if not args.no_browser:
         threading.Timer(0.3, webbrowser.open, (url,)).start()
     try:
