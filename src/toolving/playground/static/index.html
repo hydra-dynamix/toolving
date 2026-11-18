@@ -2,61 +2,83 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Learner playground</title><script>try{var t=localStorage.getItem("playground-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script><link rel="stylesheet" href="/style.css">
+<title>Conceiver playground</title><script>try{var t=localStorage.getItem("playground-theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script><link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header>
-  <strong class="brand">Learner playground</strong>
+  <strong class="brand">Conceiver playground</strong>
   <span id="session" class="muted">connecting…</span>
   <div class="learner-bar">
-    <label>Learner <select id="learner" aria-label="Learner"></select></label>
-    <button id="new-learner" type="button">New</button>
-    <button id="fork-learner" type="button">Fork</button>
+    <a class="button" href="/inspect" target="_blank" rel="noopener" title="Open the inspector on the same trie">Inspector</a>
+    <button id="assistant-toggle" type="button" aria-expanded="false" aria-controls="assistant" title="Chat with an assistant that helps write a training sequence">Assistant</button>
+    <button id="settings-open" type="button" title="agentctl and the model the assistant uses">Assistant settings</button>
     <button id="theme" type="button" title="Theme: follow the system, dark, or light">◐ System</button>
-    <label>Mode <select id="mode" aria-label="Mode"><option value="LEARNING">Learning</option><option value="PREDICTION_ONLY">Prediction only</option></select></label>
   </div>
 </header>
+<dialog id="settings" aria-labelledby="settings-title">
+  <form method="dialog" class="settings-head"><h2 id="settings-title">Assistant settings</h2><button type="submit" aria-label="Close">✕</button></form>
+  <p class="muted small">The assistant runs Claude Code through agentctl. Nothing else in the playground needs them.</p>
+  <dl id="settings-status" class="counts"></dl>
+  <section id="settings-install" hidden>
+    <h3>Install agentctl</h3>
+    <p class="muted small">agentctl comes with ldgr. Run one of these, then press Check again. If it is still not found, put its path below.</p>
+    <div id="install-agentctl"></div>
+  </section>
+  <section id="settings-claude" hidden>
+    <h3>Claude Code</h3>
+    <div id="install-claude"></div>
+  </section>
+  <form id="settings-form" autocomplete="off">
+    <h3>Settings</h3>
+    <label class="field">agentctl path <input id="setting-agentctl" placeholder="empty: found on PATH or where the installer puts it"></label>
+    <label class="field">Model <input id="setting-model" placeholder="empty: Claude Code's default, e.g. claude-opus-5-5"></label>
+    <label class="field">Reply timeout, seconds <input id="setting-timeout" type="number" min="10" max="3600"></label>
+    <details><summary>agentctl config the playground writes</summary><pre id="settings-config" class="evidence"></pre></details>
+    <p id="settings-error" class="result bad" role="alert" hidden></p>
+    <div class="row"><button id="settings-check" type="button">Check again</button><button type="submit">Save</button></div>
+  </form>
+</dialog>
 <div id="error" role="alert" hidden></div>
 <div class="layout">
   <main>
-    <div id="messages" aria-live="polite"><p class="empty muted" id="empty">Create or pick a learner, teach it a couple of examples, then ask it something new.</p></div>
+    <div id="messages" aria-live="polite"><p class="empty muted" id="empty">Write a training sequence, or ask the assistant for one, then teach it to Conceiver. Each line is asked before it is taught, so you see what Conceiver already answers.</p></div>
     <form id="composer" autocomplete="off">
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" data-tab="ask" class="on">Ask</button>
-        <button type="button" role="tab" data-tab="teach">Teach</button>
-        <button type="button" role="tab" data-tab="batch">Batch</button>
+        <button type="button" role="tab" data-tab="sequence" class="on">Sequence</button>
+        <button type="button" role="tab" data-tab="ask">Ask</button>
       </div>
-      <div data-pane="ask">
-        <textarea id="ask-input" rows="2" placeholder="Input to predict — e.g. zorb likes plonk"></textarea>
-        <div class="row"><label>Format <select id="ask-format"><option value="text">text</option><option value="json">JSON</option></select></label>
-          <label>Memories <select id="ask-evidence"><option value="narrow">narrow</option><option value="broad">broad</option><option value="none">none</option></select></label>
-          <small class="muted">Enter to send · Shift+Enter for a new line</small><button type="submit">Predict</button></div>
+      <div data-pane="sequence">
+        <textarea id="sequence-input" rows="8" placeholder="One question line, then its answer line; an empty line between teachings.&#10;&#10;file council minutes 2025&#10;records/council/2025"></textarea>
+        <div class="row"><small class="muted">Asks each question, then teaches its answer, in order.</small><button type="submit">Teach Conceiver</button></div>
       </div>
-      <div data-pane="teach" hidden>
-        <div class="pair"><input id="teach-input" placeholder="Input — e.g. alice likes bob"><span>→</span><input id="teach-output" placeholder="Output — e.g. bob likes alice"></div>
-        <div class="row"><small class="muted">One authoritative example.</small><button type="submit">Teach</button></div>
-      </div>
-      <div data-pane="batch" hidden>
-        <textarea id="batch-input" rows="5" placeholder="Alternating lines: input, output, input, output…"></textarea>
-        <div class="row"><small class="muted">Trains all pairs in one call (admin key).</small><button type="submit">Train batch</button></div>
+      <div data-pane="ask" hidden>
+        <textarea id="ask-input" rows="2" placeholder="A line to ask Conceiver — e.g. file parks minutes 2027"></textarea>
+        <div class="row"><small class="muted">Enter to send · Shift+Enter for a new line · asking records the line</small><button type="submit">Ask</button></div>
       </div>
     </form>
   </main>
   <aside>
     <section>
-      <h2>Memory</h2>
-      <textarea id="remember-input" rows="2" placeholder="An observation (text or JSON)"></textarea>
-      <div class="row"><button id="remember" type="button">Remember</button><button id="maintain" type="button" title="Re-file memories no learned pattern parsed when they were stored">Maintain</button></div>
-      <textarea id="recall-input" rows="2" placeholder="Cue to recall"></textarea>
-      <div class="row"><label>Mode <select id="recall-mode"><option value="narrow">narrow</option><option value="broad">broad</option></select></label><button id="recall" type="button">Recall</button></div>
-      <pre id="recall-output" class="evidence" hidden></pre>
+      <h2>Conceiver</h2>
+      <p class="muted small">One trie, loaded when the playground started. The inspector reads the same trie.</p>
+      <div class="row"><button id="reset" type="button" title="Load a fresh trie: everything taught is dropped">Reset trie</button></div>
     </section>
     <section>
       <h2>Activity</h2>
       <ol id="activity" reversed></ol>
     </section>
   </aside>
+  <section id="assistant" aria-label="Training-sequence assistant" hidden>
+    <div class="assistant-head"><h2>Sequence assistant</h2><span id="assistant-model" class="muted"></span>
+      <button id="assistant-reset" type="button" title="Start a new conversation">New</button><button id="assistant-close" type="button" aria-label="Close the assistant">✕</button></div>
+    <div id="assistant-log" aria-live="polite"></div>
+    <form id="assistant-form" autocomplete="off">
+      <textarea id="assistant-input" rows="3" placeholder="What should Conceiver learn to answer?"></textarea>
+      <div class="row"><small class="muted">Enter to send · Shift+Enter for a new line</small><button type="submit" id="assistant-send">Send</button></div>
+    </form>
+  </section>
 </div>
+<script src="/common.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

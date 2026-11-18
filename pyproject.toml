@@ -23,6 +23,7 @@ Issues = "https://github.com/hydra-dynamix/toolving/issues"
 
 [project.scripts]
 toolving-playground = "toolving.playground:main"
+toolving-inspector = "toolving.playground:inspector_main"
 
 [dependency-groups]
 dev = [
