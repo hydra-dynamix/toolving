@@ -47,3 +47,8 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;background:var(--
 aside h3{font-size:12px;color:var(--muted);margin:12px 0 4px;font-weight:600}.small{font-size:13px;margin:0 0 6px}
 .counts{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:10px 0;font-size:13px}.counts dt{color:var(--muted)}.counts dd{margin:0;font-variant-numeric:tabular-nums}
 .taught{padding-left:20px;margin:0;font-size:13px}.log{width:100%;border-collapse:collapse;font-size:12px}.log th{text-align:left;color:var(--muted);font-weight:600}.log td{border-top:1px solid var(--line);padding:2px 4px;vertical-align:top}.log tr.against td:nth-child(2){color:var(--bad)}
+#settings{width:min(640px,92vw);max-height:88vh;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--fg);padding:14px 18px}#settings::backdrop{background:rgb(0 0 0 / .35)}
+.settings-head{display:flex;align-items:center;justify-content:space-between}.settings-head h2{font-size:15px;margin:0}#settings h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 6px}
+#settings dd.ok{color:var(--ok)}#settings dd.bad{color:var(--bad)}#settings .counts dd{overflow-wrap:anywhere}
+.field{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted);margin:8px 0}.field input{color:var(--fg)}
+.install-step{margin:6px 0 10px}.install-step pre{margin:2px 0;user-select:all}.result.bad{color:var(--bad)}

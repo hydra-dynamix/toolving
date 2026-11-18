@@ -8,7 +8,8 @@ teaching them to a local Conceiver build.
 Two pages share one process and so one Conceiver trie:
 - `/`, the playground: a sequence editor whose sequence is taught to Conceiver
   line by line (each line asked first, then taught), and the assistant panel,
-  an LLM chat that helps write the sequence (agent.py; it runs through agentctl);
+  an LLM chat that helps write the sequence (agent.py; it runs through agentctl,
+  set up in the page's assistant settings, assistant_config.py);
 - `/inspect`, the inspector: ask a line and read its answer, steps and +/-
   evidence, teach a correction, and read what the loaded trie holds.
 
@@ -35,7 +36,8 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from .. import __version__
-from .agent import AgentError, SequenceAgent, SequenceError, agent_from_env, validate_sequence
+from .agent import AgentError, SequenceError, validate_sequence
+from .assistant_config import AssistantConfig, Settings
 from .conceiver import Conceiver, ConceiverError, run_session
 
 _ASSETS = {
@@ -63,8 +65,9 @@ def _text(body: dict[str, Any], field: str) -> str:
 
 def build_handler(token: str, port_holder: dict[str, int], *,
                   conceiver: Any = None, conceiver_unavailable: str = "No Conceiver build is configured.",
-                  agent: SequenceAgent | None = None, agent_unavailable: str = "The assistant is not configured."):
-    """`conceiver` is a conceiver.Conceiver, or anything with its ask / teach / state / reset."""
+                  assistant: AssistantConfig | None = None):
+    """`conceiver` is a conceiver.Conceiver, or anything with its ask / teach / state / reset.
+    `assistant` holds the assistant's settings and the agent built from them."""
     static = resources.files(__package__).joinpath("static")
 
     class Handler(BaseHTTPRequestHandler):
@@ -134,13 +137,21 @@ def build_handler(token: str, port_holder: dict[str, int], *,
                     "sdk_version": __version__,
                     "conceiver": {"available": True, "crate": str(getattr(conceiver, "crate", "") or "")}
                     if conceiver else {"available": False, "reason": conceiver_unavailable},
-                    "assistant": {"available": True, "label": agent.label}
-                    if agent else {"available": False, "reason": agent_unavailable},
+                    "assistant": {"available": True, "label": assistant.agent.label}
+                    if assistant and assistant.agent
+                    else {"available": False, "reason": assistant.reason if assistant else "The assistant is not configured."},
                 }
             if (method, path) == ("POST", "/api/agent/chat"):
-                if agent is None:
-                    raise _Refused(503, "AGENT_UNAVAILABLE", agent_unavailable)
-                return agent.reply(self.read_json().get("messages"))
+                if assistant is None or assistant.agent is None:
+                    raise _Refused(503, "AGENT_UNAVAILABLE", assistant.reason if assistant else "The assistant is not configured.")
+                return assistant.agent.reply(self.read_json().get("messages"))
+            if path == "/api/assistant/settings" and assistant is not None:
+                if method == "POST":
+                    try:
+                        assistant.apply(Settings.parse(self.read_json()))
+                    except ValueError as failure:
+                        raise _Refused(400, "INVALID_SETTINGS", str(failure)) from failure
+                return assistant.status()
             if path.startswith("/api/conceiver/"):
                 if conceiver is None:
                     raise _Refused(503, "CONCEIVER_UNAVAILABLE", conceiver_unavailable)
@@ -167,8 +178,6 @@ def main(argv: list[str] | None = None, *, page: str = "/") -> int:
     parser = argparse.ArgumentParser(prog="toolving-playground", description="Local browser UI for teaching a local Conceiver build.")
     parser.add_argument("--conceiver", default=os.environ.get("TOOLVING_CONCEIVER"),
                         help="the conceiver crate folder, holding its Cargo.toml (default: TOOLVING_CONCEIVER)")
-    parser.add_argument("--agentctl", help="agentctl executable for the assistant (default: agentctl on PATH)")
-    parser.add_argument("--agent", default="claude", help="the agentctl agent the assistant runs (default: claude)")
     parser.add_argument("--port", type=int, default=8766, help="local port (0 = any free port)")
     parser.add_argument("--no-browser", action="store_true", help="print the URL without opening a browser")
     args = parser.parse_args(argv)
@@ -182,12 +191,12 @@ def main(argv: list[str] | None = None, *, page: str = "/") -> int:
         except (ConceiverError, OSError) as failure:
             conceiver_unavailable = getattr(failure, "message", str(failure))
             print(f"toolving-playground: Conceiver is off: {conceiver_unavailable}", file=sys.stderr)
-    agent, agent_unavailable = agent_from_env(args.agentctl, args.agent)
+    assistant = AssistantConfig()
 
     token = secrets.token_urlsafe(24)
     port_holder: dict[str, int] = {}
     handler = build_handler(token, port_holder, conceiver=conceiver, conceiver_unavailable=conceiver_unavailable,
-                            agent=agent, agent_unavailable=agent_unavailable)
+                            assistant=assistant)
     try:
         server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     except OSError as failure:
@@ -198,7 +207,8 @@ def main(argv: list[str] | None = None, *, page: str = "/") -> int:
     base = f"http://127.0.0.1:{port_holder['port']}"
     print(f"Playground  {base}/#t={token}\nInspector   {base}/inspect#t={token}\n"
           f"Conceiver: {conceiver.crate if conceiver else 'off'}\n"
-          f"Assistant: {agent.label if agent else 'off: ' + agent_unavailable}\nCtrl+C to stop.", flush=True)
+          f"Assistant: {assistant.agent.label if assistant.agent else 'off: ' + assistant.reason}"
+          f" (settings in {assistant.home})\nCtrl+C to stop.", flush=True)
     if not args.no_browser:
         threading.Timer(0.3, webbrowser.open, (f"{base}{page}#t={token}",)).start()
     try:

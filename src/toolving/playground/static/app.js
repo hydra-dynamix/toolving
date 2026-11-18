@@ -113,8 +113,69 @@ async function askAssistant() {
 
 function resetAssistant() {
   conversation = [];
-  $("assistant-log").replaceChildren(el("p", { class: "muted", id: "assistant-empty" },
-    assistantStatus && !assistantStatus.available ? assistantStatus.reason : ASSISTANT_INTRO));
+  const off = assistantStatus && !assistantStatus.available;
+  const intro = el("div", { id: "assistant-empty" }, el("p", { class: "muted" }, off ? assistantStatus.reason : ASSISTANT_INTRO));
+  if (off) intro.append(el("button", { type: "button", class: "primary", onclick: () => openSettings().catch(() => {}) }, "Open assistant settings"));
+  $("assistant-log").replaceChildren(intro);
+}
+
+// Assistant settings: agentctl (found, version, how to install), Claude Code and
+// its sign-in, and the settings the assistant runs with.
+function commandBlock(step) {
+  const copy = el("button", { type: "button", onclick: () => {
+    navigator.clipboard?.writeText(step.command).then(() => (copy.textContent = "Copied"), () => {});
+  } }, "Copy");
+  return el("div", { class: "install-step" },
+    el("div", { class: "meta" }, step.shell), el("pre", { class: "evidence" }, step.command),
+    el("div", { class: "row" }, el("small", { class: "muted" }, step.note || ""), copy));
+}
+
+function showSettings(state) {
+  const yes = (ok, text) => el("dd", { class: ok ? "ok" : "bad" }, (ok ? "✓ " : "✗ ") + text);
+  const { agentctl, claude, config } = state;
+  const rows = [
+    el("dt", {}, "agentctl"), yes(agentctl.found, agentctl.found ? `${agentctl.path} (${agentctl.version || "version unknown"})` : "not found"),
+    el("dt", {}, "agentctl config"), config.check ? yes(config.check.ok, config.check.message || config.path) : el("dd", { class: "muted" }, config.path),
+    el("dt", {}, "Claude Code"), yes(claude.found, claude.found ? claude.path : "not found"),
+  ];
+  if (claude.found) {
+    rows.push(el("dt", {}, "Claude sign-in"), yes(claude.signed_in, claude.signed_in
+      ? `${claude.method || "signed in"}${claude.expires ? ` · expires ${new Date(claude.expires).toLocaleDateString()}` : ""}`
+      : "not signed in"));
+  }
+  rows.push(el("dt", {}, "Assistant"), yes(state.available, state.available ? "ready" : state.reason));
+  $("settings-status").replaceChildren(...rows);
+  $("settings-install").hidden = agentctl.found;
+  $("install-agentctl").replaceChildren(...state.install.agentctl.map(commandBlock));
+  $("settings-claude").hidden = claude.found && claude.signed_in;
+  $("install-claude").replaceChildren(...(claude.found
+    ? [el("p", { class: "muted small" }, "Sign in to Claude Code in a terminal:"), commandBlock({ shell: "terminal", command: state.install.login })]
+    : [el("p", { class: "muted small" }, "agentctl runs Claude Code (claude -p). Install it, then sign in with claude auth login:"),
+      commandBlock({ shell: state.install.platform === "windows" ? "PowerShell" : "sh", command: state.install.claude })]));
+  $("setting-agentctl").value = state.settings.agentctl;
+  $("setting-model").value = state.settings.model;
+  $("setting-timeout").value = state.settings.timeout;
+  $("settings-config").textContent = config.text;
+  showAssistantStatus(state.available ? { available: true, label: assistantLabel(state.settings) } : { available: false, reason: state.reason });
+}
+
+const assistantLabel = (settings) => `claude${settings.model ? " " + settings.model : ""} via agentctl`;
+
+async function openSettings() {
+  if (!$("settings").open) $("settings").showModal();
+  showSettings(await api("GET", "assistant/settings"));
+}
+
+async function saveSettings() {
+  $("settings-error").hidden = true;
+  try {
+    showSettings(await api("POST", "assistant/settings", {
+      agentctl: $("setting-agentctl").value.trim(), model: $("setting-model").value.trim(), timeout: Number($("setting-timeout").value),
+    }));
+  } catch (failure) {
+    $("settings-error").textContent = failure.message;
+    $("settings-error").hidden = false;
+  }
 }
 
 function toggleAssistant(open) {
@@ -146,6 +207,9 @@ function wire() {
   $("assistant-toggle").addEventListener("click", () => toggleAssistant($("assistant").hidden));
   $("assistant-close").addEventListener("click", () => toggleAssistant(false));
   $("assistant-reset").addEventListener("click", resetAssistant);
+  $("settings-open").addEventListener("click", () => openSettings().catch(() => {}));
+  $("settings-check").addEventListener("click", () => openSettings().catch(() => {}));
+  $("settings-form").addEventListener("submit", (event) => { event.preventDefault(); saveSettings().catch(() => {}); });
   $("assistant-form").addEventListener("submit", (event) => { event.preventDefault(); askAssistant(); });
   $("assistant-input").addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); askAssistant(); }

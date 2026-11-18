@@ -11,9 +11,33 @@
   <div class="learner-bar">
     <a class="button" href="/inspect" target="_blank" rel="noopener" title="Open the inspector on the same trie">Inspector</a>
     <button id="assistant-toggle" type="button" aria-expanded="false" aria-controls="assistant" title="Chat with an assistant that helps write a training sequence">Assistant</button>
+    <button id="settings-open" type="button" title="agentctl and the model the assistant uses">Assistant settings</button>
     <button id="theme" type="button" title="Theme: follow the system, dark, or light">◐ System</button>
   </div>
 </header>
+<dialog id="settings" aria-labelledby="settings-title">
+  <form method="dialog" class="settings-head"><h2 id="settings-title">Assistant settings</h2><button type="submit" aria-label="Close">✕</button></form>
+  <p class="muted small">The assistant runs Claude Code through agentctl. Nothing else in the playground needs them.</p>
+  <dl id="settings-status" class="counts"></dl>
+  <section id="settings-install" hidden>
+    <h3>Install agentctl</h3>
+    <p class="muted small">agentctl comes with ldgr. Run one of these, then press Check again. If it is still not found, put its path below.</p>
+    <div id="install-agentctl"></div>
+  </section>
+  <section id="settings-claude" hidden>
+    <h3>Claude Code</h3>
+    <div id="install-claude"></div>
+  </section>
+  <form id="settings-form" autocomplete="off">
+    <h3>Settings</h3>
+    <label class="field">agentctl path <input id="setting-agentctl" placeholder="empty: found on PATH or where the installer puts it"></label>
+    <label class="field">Model <input id="setting-model" placeholder="empty: Claude Code's default, e.g. claude-opus-5-5"></label>
+    <label class="field">Reply timeout, seconds <input id="setting-timeout" type="number" min="10" max="3600"></label>
+    <details><summary>agentctl config the playground writes</summary><pre id="settings-config" class="evidence"></pre></details>
+    <p id="settings-error" class="result bad" role="alert" hidden></p>
+    <div class="row"><button id="settings-check" type="button">Check again</button><button type="submit">Save</button></div>
+  </form>
+</dialog>
 <div id="error" role="alert" hidden></div>
 <div class="layout">
   <main>

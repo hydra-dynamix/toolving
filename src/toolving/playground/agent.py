@@ -3,14 +3,13 @@ user's problem and proposes a training sequence for Conceiver.
 
 The assistant's instructions live in agent_instructions.md, next to this file,
 so they can be edited for a new model without touching code. The model runs
-through agentctl (`agentctl run claude`), which uses the machine's existing
-Claude sign-in; no API key is read here.
+through agentctl (assistant_config.py sets which agent), which uses the
+machine's existing Claude sign-in; no API key is read here.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -20,9 +19,6 @@ from typing import Any, Callable, Mapping
 
 MAX_MESSAGES = 60
 MAX_MESSAGE_CHARS = 20_000
-# agentctl's claude agent takes the prompt as a command-line argument, and a
-# Windows command line holds at most 32,767 characters.
-MAX_PROMPT_CHARS = 30_000
 
 # The shape the model is asked to reply in; the reply is checked against it.
 REPLY_SCHEMA: dict[str, Any] = {
@@ -178,19 +174,20 @@ def _stdout_of(log: str) -> str:
     return body.rsplit("\nstderr:\n", 1)[0].strip()
 
 
-def agentctl_complete(executable: str, agent: str = "claude", timeout: float = 600) -> Callable[[str], str]:
-    """Run each prompt through `agentctl run <agent>` in an empty folder and return what it printed."""
+def agentctl_complete(executable: str, agent: str, timeout: float = 600, *,
+                      config_dir: Path | None = None) -> Callable[[str], str]:
+    """Run each prompt through `agentctl run <agent>` and return what the agent printed.
+    agentctl runs in `config_dir`, so an agentctl.toml there defines the agent; the
+    agent itself runs in an empty folder."""
 
     def complete(prompt: str) -> str:
-        if len(prompt) > MAX_PROMPT_CHARS:
-            raise AgentError("AGENT_TOO_LONG", "The conversation is too long to send through agentctl; start a new one.", 400)
         with tempfile.TemporaryDirectory(prefix="toolving-agent-") as work:
             prompt_file = Path(work) / "prompt.txt"
             prompt_file.write_text(prompt, encoding="utf-8")
             try:
                 done = subprocess.run(
                     [executable, "run", agent, "--prompt-file", str(prompt_file), "--json", "--cwd", work],
-                    capture_output=True, text=True, encoding="utf-8", timeout=timeout,
+                    capture_output=True, text=True, encoding="utf-8", timeout=timeout, cwd=config_dir,
                 )
                 summary = json.loads(done.stdout)[-1]["summary"]
                 log = Path(summary["raw_log_path"]).read_text(encoding="utf-8")
@@ -204,11 +201,3 @@ def agentctl_complete(executable: str, agent: str = "claude", timeout: float = 6
         return _stdout_of(log)
 
     return complete
-
-
-def agent_from_env(agentctl: str | None = None, agent: str = "claude") -> tuple[SequenceAgent | None, str]:
-    """The assistant, or None and the reason it is unavailable."""
-    executable = agentctl or shutil.which("agentctl")
-    if not executable:
-        return None, "agentctl is not on PATH; pass --agentctl with its path to use the assistant."
-    return SequenceAgent(agentctl_complete(executable, agent), label=f"{agent} via agentctl"), ""
