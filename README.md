@@ -6,13 +6,27 @@ See the [customer changelog](CHANGELOG.md) for release updates.
 
 ## Install
 
-Download the wheel from the [Toolving releases page](https://github.com/hydra-dynamix/toolving/releases), verify the published SHA-256 checksum, then install it:
+Python 3.10 or later is required. The installer finds the newest release, checks its SHA-256, and installs it with the Python tooling you already use: the active virtualenv or conda env, the Poetry, PDM or uv project in the current directory, then `uv tool`, `pipx`, or `pip --user` where your Python accepts installs. It never creates an environment or installs a package manager; if nothing applies, it stops and says why.
+
+Linux, macOS and WSL:
+
+```sh
+curl -fsSL https://toolving.com/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+irm https://toolving.com/install.ps1 | iex
+```
+
+Or download the wheel from the [Toolving releases page](https://github.com/hydra-dynamix/toolving/releases), verify the published SHA-256 checksum, and install it with your own tool:
 
 ```sh
 python -m pip install toolving-0.14.0-py3-none-any.whl
 ```
 
-Python 3.10 or later is required.
+Set `TOOLVING_API_URL` (`https://toolving.com`) and `TOOLVING_API_KEY` in your environment. Step-by-step setup for each system and shell, written so a coding agent can follow it, is at [toolving.com/agents.md](https://toolving.com/agents.md).
 
 ## Teach and query Conceiver
 
@@ -34,10 +48,10 @@ with ConceiverClient(api_url, account_api_key) as client:
         key="query-acme",
     )
     if prediction.status == "ANSWER":
-        print(prediction.output)
+        # A best guess plus a flag: hypothesis, confident or highly confident.
+        print(prediction.output, prediction.confidence)
     else:
         print("UNRESOLVED")
-    print(prediction.confidence)
     print(prediction.evidence.markdown)
 
     current_text = instance.training_sequence()["text"]  # available without storage
@@ -66,6 +80,8 @@ with ConceiverClient(api_url, account_api_key) as client:
 Final retirement on an account with storage returns checksum-verified artifact metadata. Final retirement without storage returns `persisted=False` and discards live memory. Reaping one of several active instances does not retire the shared account state.
 
 ## Recovery
+
+An API error raises `ConceiverAPIError` with `status`, `code`, `retryable` and `operation_id`. `409 INSTANCE_INACTIVE` means the instance has retired: create a new one. `422 RUNTIME_OPERATION_REJECTED` means Conceiver could not carry out that operation; it has failed for good, nothing is charged, and repeating it returns the same error, so do not retry it.
 
 Every mutation has an idempotency key. The SDK creates one when `key` is omitted. Supply and retain your own key when a request may need recovery. Repeating the same request with the same key returns the original operation result without repeating learning or charging. Creates are the one exception: a repeated create returns the same instance while it is live, but once that instance has retired the service starts a new one, and the returned instance has `replaced=True` with `replaced_instance_id` and `replaced_operation_id`. Use a new key for each create you mean to be new. `client.operation(operation_id)` reads an accepted operation after response loss.
 
