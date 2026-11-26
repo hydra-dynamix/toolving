@@ -58,7 +58,9 @@ class Retirement:
     artifact: Artifact | None
     purpose: Literal["manual", "retirement", "automatic-recovery"] | None = None
     rotated_sequence_ids: tuple[str, ...] = ()
-    skipped: str | None = None  # "NOTHING_TAUGHT": no sequence or artifact was kept
+    # Why nothing was kept: "NOTHING_TAUGHT", "DISCARDED" (an unload), "SAVE_OFF" (spin-down saving
+    # is off), or "NO_STORAGE_ROOM" / "NO_UNPINNED_SLOT" (pinned artifacts are never overwritten).
+    skipped: str | None = None
 
 
 class ConceiverClient:
@@ -111,6 +113,16 @@ class ConceiverClient:
 
     def storage(self) -> dict[str, Any]:
         return self._request("GET", "/v1/storage")
+
+    def spin_down(self) -> dict[str, Any]:
+        """Whether spin-down saves the model (`save`), and what a spin-down keeps now (`stores`:
+        "artifact", "recovery-sequence" or "nothing", with its `reason`)."""
+        return self._request("GET", "/v1/storage/spin-down")
+
+    def set_spin_down(self, save: bool) -> dict[str, Any]:
+        """Save the model as a stored artifact when an instance spins down (idle retirement or
+        reap), or keep nothing. Pinned artifacts are never overwritten."""
+        return self._request("PUT", "/v1/storage/spin-down", {"save": save})
 
     def create(
         self,
