@@ -3,6 +3,10 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
+## 0.16.2 (2026-11-26)
+
+- Agent skill and README: the numbers model is described by what it accepts, returns and declines. No code changes.
+
 ## 0.16.1 (2026-11-26)
 
 - Agent skill and README: the hosted models are `language` and `numbers` (the skill said `language` and `json`). They now describe the numbers model and what it gets wrong, `spin_down()` / `set_spin_down()`, when an answer stays a `hypothesis`, exact-word matching, and that `pip --user` puts `toolving-skill` in a folder that is often not on `PATH` (`python -m toolving.skill` works either way). No code changes.
