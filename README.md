@@ -79,6 +79,16 @@ with ConceiverClient(api_url, account_api_key) as client:
 
 Final retirement on an account with storage returns checksum-verified artifact metadata. Final retirement without storage returns `persisted=False` and discards live memory. Reaping one of several active instances does not retire the shared account state.
 
+## Set delimiters for a language instance
+
+By default a language instance splits at the space and keeps each of `. , ; : ! ? ( ) [ ] { } " /` as a word of its own. Pass `delimiters` at creation time to choose others:
+
+```python
+instance = client.create(model="language", delimiters={"split": " ", "keep": ".(),"})
+```
+
+`split` characters separate words and are dropped; `keep` characters separate words and are words themselves. Use ASCII characters, at least one `split` character, and each character once across both.
+
 ## Recovery
 
 An API error raises `ConceiverAPIError` with `status`, `code`, `retryable` and `operation_id`. `409 INSTANCE_INACTIVE` means the instance has retired: create a new one. `422 RUNTIME_OPERATION_REJECTED` means Conceiver could not carry out that operation; it has failed for good, nothing is charged, and repeating it returns the same error, so do not retry it.

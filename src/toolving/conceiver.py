@@ -1,5 +1,6 @@
 """Client for authenticated Conceiver instances and replayable event sequences."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 from urllib.parse import quote, urlencode
@@ -119,9 +120,12 @@ class ConceiverClient:
         client_host: Literal["pi", "codex", "claude-code"] | None = None,
         compatibility_scope: str | None = None,
         artifact_id: str | None = None,
+        delimiters: Mapping[str, str] | None = None,
         key: str | None = None,
     ) -> "ConceiverInstance":
         body: dict[str, Any] = {"sequence_id": sequence_id}
+        if delimiters is not None:
+            body["delimiters"] = dict(delimiters)
         if artifact_id is not None:
             # Load a language artifact retired by an earlier instance; new instances otherwise start empty.
             body["artifact_id"] = artifact_id

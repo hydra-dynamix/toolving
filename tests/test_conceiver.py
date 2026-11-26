@@ -94,6 +94,14 @@ def test_model_catalog_storage_and_explicit_selection():
         "host": "pi",
         "compatibilityScope": "a" * 64,
     }
+    assert client.create(
+        model="language", delimiters={"split": " ", "keep": ".(),"}
+    ).instance_id == "instance"
+    assert requests[-1] == (
+        "POST",
+        "/v1/instances",
+        {"sequence_id": None, "model": "language", "delimiters": {"split": " ", "keep": ".(),"}},
+    )
     with pytest.raises(ValueError):
         client.create(model="json")
 

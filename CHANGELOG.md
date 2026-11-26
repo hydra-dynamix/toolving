@@ -3,6 +3,10 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
+## 0.15.1 (2026-11-26)
+
+- Conceiver: set a language instance's word delimiters with `create(delimiters={"split": " ", "keep": ".(),"})`. `split` characters separate words and are dropped; `keep` characters separate words and are words themselves. Without it the instance keeps the owner's default (split at the space; keep `. , ; : ! ? ( ) [ ] { } " /`).
+
 ## 0.15.0 (2026-11-25)
 
 - Agent skill: the SDK ships the `toolving-conceiver` skill, which teaches a coding agent how to teach, query and correct Conceiver. Install it with `python -m toolving.skill install` (or `toolving-skill install`) for Claude Code, Codex, Pi and any host that reads `~/.agents/skills`; `--dir` installs it into any other harness's skills folder, `print` prints it.
