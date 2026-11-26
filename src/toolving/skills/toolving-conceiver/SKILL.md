@@ -90,9 +90,8 @@ calc.query("1 + 2 * 3").status           # 'UNRESOLVED' (one operation per quest
 
 Operations: `plus`/`+`, `minus`/`-`, `times`/`*`/`x`, `divided by`/`/`, `mod`/`%`,
 `compared to` (`greater`, `less`, `same`), and `and`, `or`, `xor` on whole numbers. Negatives,
-`1,000` groups, six exact decimals; a division by zero is `UNRESOLVED`. Add, subtract, compare
-and the bitwise operations are machines induced from taught examples; signs, multiply, divide
-and remainder are wired by hand over them. Every answer is `hypothesis`, right or wrong, so
+`1,000` groups, six exact decimals; a division by zero is `UNRESOLVED`. Every answer is
+`hypothesis`, right or wrong, so
 ask exactly `<number> <operation> <number>` in lower case: words around it (`what is 2 + 2`
 answers `what`), number words (`two plus two` answers `10`), whole parts above about a
 trillion, and bitwise operations on negatives come back wrong, not declined.

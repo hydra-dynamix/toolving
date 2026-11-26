@@ -88,7 +88,7 @@ calc.query("10 / 4").text           # '2.5'
 calc.query("1 + 2 * 3").status      # 'UNRESOLVED'
 ```
 
-A ready-made calculator: `plus`/`+`, `minus`/`-`, `times`/`*`/`x`, `divided by`/`/`, `mod`/`%`, `compared to`, and `and`/`or`/`xor`, with negatives, `1,000` groups and six exact decimals, one operation per question. Add, subtract, compare and the bitwise operations are machines induced from taught examples; signs, multiply, divide and remainder are wired by hand over them. Every answer is `hypothesis`; questions in other forms can come back wrong rather than declined. See [toolving.com/docs/sdk](https://toolving.com/docs/sdk#the-numbers-model).
+A ready-made calculator: `plus`/`+`, `minus`/`-`, `times`/`*`/`x`, `divided by`/`/`, `mod`/`%`, `compared to`, and `and`/`or`/`xor`, with negatives, `1,000` groups and six exact decimals, one operation per question. Every answer is `hypothesis`; questions in other forms can come back wrong rather than declined. See [toolving.com/docs/sdk](https://toolving.com/docs/sdk#the-numbers-model).
 
 ## Saving at spin-down
 
