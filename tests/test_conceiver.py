@@ -195,3 +195,20 @@ def test_reap_preserves_compatibility_with_an_earlier_sequence_result():
     assert retirement.persisted is True
     assert retirement.retired is False
     assert retirement.sequence_id == "sequence" and retirement.artifact is None
+
+
+def test_numbers_model_selection():
+    requests = []
+
+    def handler(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={"operation_id": "op_create", "status": "SUCCEEDED", "result": {"instance_id": "instance"}},
+        )
+
+    client = _client(handler)
+    assert client.create(model="numbers").instance_id == "instance"
+    assert requests[-1] == {"sequence_id": None, "model": "numbers"}
+    with pytest.raises(ValueError):
+        client.create(model="numbers", client_host="pi")

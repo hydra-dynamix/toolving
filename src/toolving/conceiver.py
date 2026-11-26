@@ -128,7 +128,7 @@ class ConceiverClient:
         self,
         *,
         sequence_id: str | None = None,
-        model: Literal["language", "json"] | None = None,
+        model: Literal["language", "json", "numbers"] | None = None,
         client_host: Literal["pi", "codex", "claude-code"] | None = None,
         compatibility_scope: str | None = None,
         artifact_id: str | None = None,
@@ -155,10 +155,11 @@ class ConceiverClient:
                     },
                 }
             )
-        elif model == "language":
+        elif model in ("language", "numbers"):
+            # "numbers" starts from the ready-made numbers model: arithmetic already taught.
             if client_host is not None or compatibility_scope is not None:
-                raise ValueError("language model selection does not accept a JSON client scope")
-            body["model"] = "language"
+                raise ValueError(model + " model selection does not accept a JSON client scope")
+            body["model"] = model
         elif client_host is not None or compatibility_scope is not None:
             raise ValueError("select the JSON model before supplying its client scope")
         receipt = self._request("POST", "/v1/instances", body, key)

@@ -3,6 +3,11 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
+## 0.16.0 (2026-11-26)
+
+- Conceiver: a ready-made numbers model, a basic calculator. `create(model="numbers")` starts an instance that already answers `1234 plus 4321`, `-5 + 3`, `2.5 * 4`, `10 / 4`, `17 % 5`, `1,000 - 2,500`, `300 compared to 299` (greater / less / same) and `12 and 10` (also or, xor): words or symbols, negatives, up to six decimals, whole parts up to about a trillion. It declines what it cannot answer, such as a division by zero; chained expressions like `1 + 2 * 3` are not handled. Teach it more like any instance.
+- Conceiver: `spin_down()` reads and `set_spin_down(save)` sets whether an instance's spin-down (an idle retirement or a reap) saves the model as a stored artifact. On by default.
+
 ## 0.15.1 (2026-11-26)
 
 - Conceiver: set a language instance's word delimiters with `create(delimiters={"split": " ", "keep": ".(),"})`. `split` characters separate words and are dropped; `keep` characters separate words and are words themselves. Without it the instance keeps the owner's default (split at the space; keep `. , ; : ! ? ( ) [ ] { } " /`).
