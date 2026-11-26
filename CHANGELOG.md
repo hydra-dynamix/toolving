@@ -3,6 +3,11 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
+## 0.15.0 (unreleased)
+
+- Agent skill: the SDK ships the `toolving-conceiver` skill, which teaches a coding agent how to teach, query and correct Conceiver. Install it with `python -m toolving.skill install` (or `toolving-skill install`) for Claude Code, Codex, Pi and any host that reads `~/.agents/skills`; `--dir` installs it into any other harness's skills folder, `print` prints it.
+- Predictions accept the confidence `ambiguous`: an answer whose evidence for and against is level.
+
 ## 0.14.0 (2026-11-12)
 
 - Conceiver 2.0: predictions accept the confidence `highly confident`. `high` is still accepted for Conceiver 1.x results.

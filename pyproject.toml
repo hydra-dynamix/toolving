@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "toolving"
-version = "0.14.0"
+version = "0.15.0"
 description = "Agent-friendly Python client for the Toolving API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,7 @@ Issues = "https://github.com/hydra-dynamix/toolving/issues"
 
 [project.scripts]
 toolving-playground = "toolving.playground:main"
+toolving-skill = "toolving.skill:main"
 toolving-inspector = "toolving.playground:inspector_main"
 
 [dependency-groups]
