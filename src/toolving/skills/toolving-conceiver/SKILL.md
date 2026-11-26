@@ -90,11 +90,12 @@ calc.query("1 + 2 * 3").status           # 'UNRESOLVED' (one operation per quest
 
 Operations: `plus`/`+`, `minus`/`-`, `times`/`*`/`x`, `divided by`/`/`, `mod`/`%`,
 `compared to` (`greater`, `less`, `same`), and `and`, `or`, `xor` on whole numbers. Negatives,
-`1,000` groups, six exact decimals; a division by zero is `UNRESOLVED`. Every answer is
-`hypothesis`, right or wrong, so
-ask exactly `<number> <operation> <number>` in lower case: words around it (`what is 2 + 2`
-answers `what`), number words (`two plus two` answers `10`), whole parts above about a
-trillion, and bitwise operations on negatives come back wrong, not declined.
+`1,000` groups, up to six decimals, whole numbers up to 1,099,511,627,775. It declines
+(`UNRESOLVED`) rather than guesses: a division by zero, chained expressions, numbers past
+those limits, number words (`two plus two`), other words around the expression
+(`what is 2 + 2`), and `and`/`or`/`xor` on negatives or decimals. Ask exactly
+`<number> <operation> <number>`. Every answer is `hypothesis`; check `status`, not
+`confidence`.
 
 ## How to teach different things
 
@@ -214,8 +215,9 @@ words themselves. Use ASCII, at least one `split` character, each character once
   `UNRESOLVED` (`my card was declined -> billing` teaches nothing about
   `my payment failed`). Send those to an LLM or a person, then teach the answer.
 - **Know which words matter.** Any input word that also appears in the answer becomes a
-  slot. After `turn on kitchen lights -> lights.on(kitchen)` (twice),
-  `turn off kitchen lights` answers `lights.off(kitchen)` (confident). If that is wrong,
+  slot. After `turn on kitchen lights -> lights.on(kitchen)` and `turn on hall lights ->
+  lights.on(hall)`, `turn off kitchen lights` answers `lights.off(kitchen)`, as a hypothesis
+  (that slot has only ever held `on`). If that is wrong,
   resolve it with the right answer once: resolved with `lights.dim(kitchen)`, `turn off hall
   lights` then answers `lights.dim(hall)`, and the pattern's other answers drop to
   `hypothesis` until they gain evidence again.
