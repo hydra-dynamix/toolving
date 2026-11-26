@@ -3,6 +3,10 @@
 Release notes for the `toolving` package. Each section is shown on the
 Releases page (`/releases`) for its version.
 
+## 0.16.1 (2026-11-26)
+
+- Agent skill and README: the hosted models are `language` and `numbers` (the skill said `language` and `json`). They now describe the numbers model and what it gets wrong, `spin_down()` / `set_spin_down()`, when an answer stays a `hypothesis`, exact-word matching, and that `pip --user` puts `toolving-skill` in a folder that is often not on `PATH` (`python -m toolving.skill` works either way). No code changes.
+
 ## 0.16.0 (2026-11-26)
 
 - Conceiver: a ready-made numbers model, a basic calculator. `create(model="numbers")` starts an instance that already answers `1234 plus 4321`, `-5 + 3`, `2.5 * 4`, `10 / 4`, `17 % 5`, `1,000 - 2,500`, `300 compared to 299` (greater / less / same) and `12 and 10` (also or, xor): words or symbols, negatives, up to six decimals, whole parts up to about a trillion. It declines what it cannot answer, such as a division by zero; chained expressions like `1 + 2 * 3` are not handled. Teach it more like any instance.
