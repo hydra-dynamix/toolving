@@ -23,8 +23,10 @@ irm https://toolving.com/install.ps1 | iex
 Or download the wheel from the [Toolving releases page](https://github.com/hydra-dynamix/toolving/releases), verify the published SHA-256 checksum, and install it with your own tool:
 
 ```sh
-python -m pip install toolving-0.14.0-py3-none-any.whl
+python -m pip install toolving-0.16.0-py3-none-any.whl
 ```
+
+With `pip --user`, `uv tool` or `pipx`, the commands `toolving-skill`, `toolving-playground` and `toolving-inspector` go into the user scripts folder (`~/.local/bin` on Linux), which is often not on `PATH`; `python -m toolving.skill` works either way.
 
 Set `TOOLVING_API_URL` (`https://toolving.com`) and `TOOLVING_API_KEY` in your environment. Step-by-step setup for each system and shell, written so a coding agent can follow it, is at [toolving.com/agents.md](https://toolving.com/agents.md).
 
@@ -73,9 +75,24 @@ with ConceiverClient(api_url, account_api_key) as client:
     print(retirement.persisted, retirement.artifact)
 ```
 
-`client.models()` lists selectable hosted models. JSON selection also requires `client_host` and a 64-character hexadecimal `compatibility_scope`. `client.storage()` reports whether durable account storage is enabled and its bounded usage.
+`client.models()` lists the hosted models: `language`, which learns what you teach it, and `numbers`, a ready-made calculator. JSON answers are taught to a `language` instance as one line; the unlisted `json` selection is for agent-harness clients and also requires `client_host` and a 64-character hexadecimal `compatibility_scope`. `client.storage()` reports whether durable account storage is enabled, its bounded usage, and `spin_down`.
 
-`instance.training_sequence()` assembles current training text without storing it, so Free accounts can copy and manage sequences locally. `save()` requires account storage. Saved training sequences are UTF-8 `.txt` files. Each teaching uses one question line and one answer line; one empty line separates teachings. `ingest_training_sequence()` validates this format and sends each pair through normal teaching. A standard query costs 1 credit. `with_memory=True` requests complete relevant teaching episodes and costs 2 credits. Teaching costs 5 credits. Conceiver returns `hypothesis`, `confident`, `highly confident` or `ambiguous` as evidence levels (Conceiver 1.x said `high`), not probability percentages: an answer's evidence for (times it was given or confirmed) minus its evidence against (times it was corrected away), one, two, three or more, and `ambiguous` when they are level. One example already gives a best guess for a new input, flagged `hypothesis`; you decide whether to use it. When nothing taught fits, the result is `UNRESOLVED`, with no answer, only evidence. A second example of the same pattern raises the level. `python -m toolving.skill install` installs the `toolving-conceiver` skill, which shows an agent how to teach each kind of task. Always check `status` before using an answer.
+`instance.training_sequence()` assembles current training text without storing it, so Free accounts can copy and manage sequences locally. `save()` requires account storage. Saved training sequences are UTF-8 `.txt` files. Each teaching uses one question line and one answer line; one empty line separates teachings. `ingest_training_sequence()` validates this format and sends each pair through normal teaching. A standard query costs 1 credit. `with_memory=True` requests complete relevant teaching episodes and costs 2 credits. Teaching costs 5 credits. Conceiver returns `hypothesis`, `confident`, `highly confident` or `ambiguous` as evidence levels (Conceiver 1.x said `high`), not probability percentages: an answer's evidence for (times it was given or confirmed) minus its evidence against (times it was corrected away), one, two, three or more, and `ambiguous` when they are level. One example already gives a best guess for a new input, flagged `hypothesis`; you decide whether to use it. When nothing taught fits, the result is `UNRESOLVED`, with no answer, only evidence. A second example of the same pattern raises the level, for new words only once the slot has held two or more different words. `python -m toolving.skill install` installs the `toolving-conceiver` skill, which shows an agent how to teach each kind of task. Always check `status` before using an answer.
+
+## The numbers model
+
+```python
+calc = client.create(model="numbers")
+calc.query("1234 plus 4321").text   # '5555'
+calc.query("10 / 4").text           # '2.5'
+calc.query("1 + 2 * 3").status      # 'UNRESOLVED'
+```
+
+A ready-made calculator: `plus`/`+`, `minus`/`-`, `times`/`*`/`x`, `divided by`/`/`, `mod`/`%`, `compared to`, and `and`/`or`/`xor`, with negatives, `1,000` groups and six exact decimals, one operation per question. Add, subtract, compare and the bitwise operations are machines induced from taught examples; signs, multiply, divide and remainder are wired by hand over them. Every answer is `hypothesis`; questions in other forms can come back wrong rather than declined. See [toolving.com/docs/sdk](https://toolving.com/docs/sdk#the-numbers-model).
+
+## Saving at spin-down
+
+`client.spin_down()` reads and `client.set_spin_down(save)` sets whether a spin-down (a `reap()` or an idle retirement) saves the model as a stored artifact; on by default. When storage is full the oldest unpinned artifact is overwritten; pinned artifacts never are. With no room even then nothing is stored, and the retirement's `skipped` is `NO_STORAGE_ROOM` or `NO_UNPINNED_SLOT` (`SAVE_OFF` when the setting is off).
 
 Final retirement on an account with storage returns checksum-verified artifact metadata. Final retirement without storage returns `persisted=False` and discards live memory. Reaping one of several active instances does not retire the shared account state.
 

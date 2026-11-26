@@ -22,7 +22,7 @@ import os
 from toolving import ConceiverClient
 
 with ConceiverClient(os.environ["TOOLVING_API_URL"], os.environ["TOOLVING_API_KEY"]) as client:
-    print([m["id"] for m in client.models()["models"]])   # ['language', 'json']
+    print([m["id"] for m in client.models()["models"]])   # ['language', 'numbers']
 ```
 
 If `toolving` is not installed, follow `{TOOLVING_API_URL}/agents.md` (by default
@@ -60,13 +60,42 @@ confirmed (for), minus how many times it was corrected away (against).
 
 | `confidence` | Evidence | What to do with it |
 |---|---|---|
-| `hypothesis` | One more for than against, or the input only fits a pattern in a new way (a new word in a slot, a repeated word, a different number of words) | A best guess. Use it where a wrong answer is cheap, or have it checked. |
+| `hypothesis` | One more for than against, or the input only fits a pattern in a new way (a new word in a slot that has only ever held one word, several words where only single words were taught, a repeated word) | A best guess. Use it where a wrong answer is cheap, or have it checked. |
 | `confident` | Two more for than against | Usually safe to act on. |
 | `highly confident` | Three or more | Act on it. |
 | `ambiguous` | For and against are level | Do not act on it; ask, then resolve. |
 
 These are evidence counts, not probabilities. Decide in your program which level is enough
-for each action.
+for each action. A slot rises above `hypothesis` for new words only once it has held two or
+more different words. A value of several words is a `hypothesis` until you confirm one such
+answer with `resolve()`; later values of that shape then count like any other.
+
+Matching is by exact word, including capital letters. Taught `delete file report ->
+rm(report)` and `delete file notes -> rm(notes)`, the inputs `remove file report`,
+`Delete file report` and `please delete file report` are `UNRESOLVED`, and `delete file report please` answers
+`rm(report please)` as a hypothesis. Normalise input before you query, or teach each phrasing.
+
+## Arithmetic: the numbers model
+
+Do not teach arithmetic. `client.create(model="numbers")` is a ready-made calculator:
+
+```python
+calc = client.create(model="numbers")
+calc.query("1234 plus 4321").text        # '5555'
+calc.query("-5 + 3").text                # '-2'
+calc.query("10 / 4").text                # '2.5'
+calc.query("300 compared to 299").text   # 'greater'
+calc.query("1 + 2 * 3").status           # 'UNRESOLVED' (one operation per question)
+```
+
+Operations: `plus`/`+`, `minus`/`-`, `times`/`*`/`x`, `divided by`/`/`, `mod`/`%`,
+`compared to` (`greater`, `less`, `same`), and `and`, `or`, `xor` on whole numbers. Negatives,
+`1,000` groups, six exact decimals; a division by zero is `UNRESOLVED`. Add, subtract, compare
+and the bitwise operations are machines induced from taught examples; signs, multiply, divide
+and remainder are wired by hand over them. Every answer is `hypothesis`, right or wrong, so
+ask exactly `<number> <operation> <number>` in lower case: words around it (`what is 2 + 2`
+answers `what`), number words (`two plus two` answers `10`), whole parts above about a
+trillion, and bitwise operations on negatives come back wrong, not declined.
 
 ## How to teach different things
 
@@ -200,7 +229,12 @@ words themselves. Use ASCII, at least one `split` character, each character once
   `client.create(sequence_id=...)`, or teach it into another instance with
   `instance.ingest_training_sequence(text)`.
 - `instance.reap()`: releases the instance. Without storage its memory is discarded; with
-  storage it is saved as an artifact a later instance loads.
+  storage it is saved as an artifact that `client.create(artifact_id=...)` loads. Saving at
+  spin-down is a setting, on by default: `client.spin_down()` reads it,
+  `client.set_spin_down(False)` turns it off (the reap then keeps nothing, `skipped` is
+  `SAVE_OFF`). When storage is full the oldest unpinned artifact is overwritten; pinned ones
+  never are, and with no room left the reap stores nothing (`NO_STORAGE_ROOM`,
+  `NO_UNPINNED_SLOT`).
 
 ## Errors
 
